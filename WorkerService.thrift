@@ -1,11 +1,13 @@
 include  "SharedService.thrift"
 
 namespace cpp WorkerService
+namespace py WorkerService
+
 
 
 service WorkerService extends SharedService.SharedService {
 	// recv data from master
-	void recvGlobalDataItems(1: map<string,i32> GlobalDataItemsMap);
+	// void recvDataItemsMap(1: map<string,i64> DataItemsMap);
 
-	map<string,map<i32,list<i16>>> recvTransactions(1: list<SharedService.Transaction> TransactionList);
+	SharedService.WorkerResponse recvTransactions(1: list<SharedService.Transaction> TransactionsList, 2: map<string,double> AccountsList);
 }

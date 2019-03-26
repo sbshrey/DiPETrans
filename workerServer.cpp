@@ -10,7 +10,10 @@
 #include <thrift/transport/TServerSocket.h>
 #include <thrift/transport/TBufferTransports.h>
 
+#include "Logger.h"
 #include <iostream>
+
+
 
 using namespace std;
 using namespace ::apache::thrift;
@@ -21,47 +24,115 @@ using namespace ::apache::thrift::server;
 using namespace  ::WorkerService;
 using namespace  ::SharedService;
 
+std::map<string, int64_t> GlobalDataItemsMap;
+string MSG="WorkerServer";
+
 class WorkerServiceHandler : virtual public WorkerServiceIf {
  public:
   WorkerServiceHandler() {
     // Your initialization goes here
+      
+      
   }
 
-  void recvGlobalDataItems(const std::map<std::string, int32_t> & GlobalDataItemsMap) {
+  void recvTransactions( ::SharedService::WorkerResponse& _return, const std::vector< ::SharedService::Transaction> & TransactionsList, const std::map<std::string, double> & AccountsList) {
     // Your implementation goes here
-    
-    cout << GlobalDataItemsMap.size() << endl;
-    /*map<string,int32_t>::iterator itr;
-    for (itr = GlobalDataItemsMap.begin(); itr != GlobalDataItemsMap.end(); ++itr) {
-      cout << itr->first << "\t" << itr->second << endl;
-    }*/
-    
-    printf("recvGlobalDataItems\n");
-  }
+    //_return.free();
+    printf("\n\nrecvTransactions\n");
+    int successful_transactions = 0;
+    int failed_transactions = 0;
+    int total_transactions = 0;
 
-  void recvTransactions(std::map<std::string, std::map<int32_t, std::vector<int16_t> > > & _return, const std::vector< ::SharedService::Transaction> & TransactionList) {
-    // Your implementation goes here
-    cout << TransactionList.size() << endl;
+    double tx_fees = 0;
+
+    for (auto const& account: AccountsList)
+    {
+      _return.accountList[account.first] = account.second;
+    }
+
+    for (auto const& tx: TransactionsList) {
+      cout << tx.transactionID << "\t";
+      double fee;
+
+      if (_return.accountList[tx.fromAddress] >= double(tx.value))
+      {
+        fee = (double)(tx.gasPrice) * (double)(tx.gas);
+        _return.accountList[tx.fromAddress] -= (double)(tx.value) - fee;
+        _return.accountList[tx.toAddress] += (double)(tx.value);
+        
+        //cout << "successful_transactions" << endl;
+        //cout << "from_address: " << tx["from_address"] << DataItemsMap[tx["from_address"]] << endl; 
+        //cout << "to_address: " << tx["to_address"] << DataItemsMap[tx["to_address"]] << endl; 
+        successful_transactions++;
+      } else {
+        //cout << "Block:"+i_str << endl;
+        //cout << "Transaction: " <<DataItemsMap[tx["from"]] << "\t" << ((double)tx["value"]) << endl;
+        //cout << "Transaction Failed!!! Insufficient Balance" << endl;
+        failed_transactions++;
+      }
+      tx_fees += fee;
+      _return.transactionIDList.push_back(tx.transactionID);
+      total_transactions++;
+    }
+
+    _return.transactionFees = tx_fees;
+
+    //cout << tx_fees << endl;
+  
+    /*
+    map<string,double>::iterator it;
+    for (it = _return.accountList.begin(); it != _return.accountList.end(); ++it)
+    {
+      cout << it->first << "\t" << it->second << endl;
+    }
+    cout << endl;
+    for (auto const & i:_return.transactionIDList)
+    {
+      cout << i << "\t";
+    }
+    cout << endl;
+    */
+    cout << "Transactions Fees: " << _return.transactionFees << endl;
+
+    cout << "\nTotal: " << total_transactions << endl;
+    cout << "Success: " << successful_transactions << endl;
+    cout << "Failed: " << failed_transactions << endl;
+    cout << endl;
+
+    /*cout << TransactionsList.size() << endl;
     map<string,std::vector<int16_t>> txnOrder;
-    map<string,int32_t> accountValue;
-    for (auto const& tx: TransactionList) {
-      //printf("%d\n", tx.amount);
-      cout << tx.transactionID << "\t" <<tx.senderAddress << "\t" << tx.receiverAddress << "\t" << tx.amount << endl;
-      txnOrder[tx.senderAddress].push_back(tx.transactionID);
+    //map<string,int64_t> accountValue;
+    for (auto const& tx: TransactionsList) {
+      //printf("%d\n", tx.value);
+      cout << tx.transactionID << "\t" <<tx.fromAddress << "\t" << tx.toAddress << "\t" << tx.value << endl;
       
       // ToDo --> add logic to execute transaction
-      accountValue[tx.senderAddress] += (-1)*tx.amount;
-      txnOrder[tx.receiverAddress].push_back(tx.transactionID);
-      accountValue[tx.receiverAddress] += tx.amount;
+      if (GlobalDataItemsMap[tx.fromAddress] > tx.value) {
+        GlobalDataItemsMap[tx.fromAddress] -= tx.value;
+        txnOrder[tx.fromAddress].push_back(tx.transactionID);
+        GlobalDataItemsMap[tx.toAddress] += tx.value;
+        //accountValue[tx.fromAddress] += (-1)*tx.value;
+        txnOrder[tx.toAddress].push_back(tx.transactionID);
+        //accountValue[tx.toAddress] += tx.value;
+      }
+      cout << tx.transactionID << "\t" << tx.fromAddress  
+           << "\t" << GlobalDataItemsMap[tx.fromAddress] 
+           << "\t" << tx.toAddress << "\t" 
+           << GlobalDataItemsMap[tx.toAddress] << endl;
     }
-    for (std::map<string,int32_t>::iterator i = accountValue.begin(); i != accountValue.end(); ++i)
+    //_return.clear();
+    for (std::map<string,int64_t>::iterator i = GlobalDataItemsMap.begin(); i != GlobalDataItemsMap.end(); ++i)
     {
-      std::map<int32_t, std::vector<int16_t>> tmpMap;
-      tmpMap[i->second] = txnOrder[i->first];
-      _return[i->first] = tmpMap;
-    }
+      if (txnOrder[i->first].size() > 0)
+      {
+        
+        std::map<int64_t, std::vector<int16_t>> tmpMap;
+        tmpMap[i->second] = txnOrder[i->first];
+        //_return[i->first] = tmpMap;
+      }
+      
+    }*/
 
-    printf("recvTransactions\n");
   }
 
 };

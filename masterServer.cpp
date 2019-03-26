@@ -39,8 +39,8 @@
 #include "Logger.h"
 
 
-#define NUM_WORKERS 1
-#define NUM_THREADS 1
+#define NUM_WORKERS 5
+#define NUM_THREADS 5
 #define NUM_ACCOUNTS 50
 #define NUM_TRANSACTIONS 10
 #define RANDOM_SEED 10
@@ -90,7 +90,7 @@ struct thread_data {
 };
 
 
-map< string,double> LocalDataItemsMap;
+//map< string,double> LocalDataItemsMap;
 //map< int16_t,map<string,map<double,vector<int16_t>>>> GlobalDataItemsMap;
 map<int16_t,vector<Transaction>> sendTransactionMap;
 
@@ -101,7 +101,7 @@ map<int16_t, set<int16_t>> ccTransactionMap;
 
 void clear_memory() {
   //cout << "Before clear size " <<LocalDataItemsMap.size() << endl;
-  LocalDataItemsMap.clear();
+  //LocalDataItemsMap.clear();
   //cout << "After clear size " <<LocalDataItemsMap.size() << endl;
   sendTransactionMap.clear();
   ccTransactionMap.clear();
@@ -181,6 +181,8 @@ void analyze(vector<Transaction> TransactionList) {
 
 
 void *connectWorker (void *threadarg) {
+  map< string,double> LocalDataItemsMap;
+
   struct thread_data *worker;
   worker = (struct thread_data *) threadarg;
 
@@ -205,7 +207,7 @@ void *connectWorker (void *threadarg) {
   }
   Logger::instance().log(MSG+" LocalDataItemsMap generation for worker "+to_string(worker->workerID)+" ends", Logger::kLogLevelInfo);
   
-
+  cout << "LocalDataItemsMap size: " << LocalDataItemsMap.size();
   //LocalDataItemsMap.clear();
   Logger::instance().log(MSG+" "+to_string(worker->workerID)+" recvTransactions() starts", Logger::kLogLevelInfo);
   printf("Sending transactionsList and LocalDataItemsMap to worker nodes\n");

@@ -39,8 +39,8 @@
 #include "Logger.h"
 
 
-#define NUM_WORKERS 5
-#define NUM_THREADS 5
+#define NUM_WORKERS 1
+#define NUM_THREADS 1
 #define NUM_ACCOUNTS 50
 #define NUM_TRANSACTIONS 10
 #define RANDOM_SEED 10
@@ -100,9 +100,9 @@ map<int16_t, set<int16_t>> ccTransactionMap;
 
 
 void clear_memory() {
-  cout << "Before clear size " <<LocalDataItemsMap.size() << endl;
+  //cout << "Before clear size " <<LocalDataItemsMap.size() << endl;
   LocalDataItemsMap.clear();
-  cout << "After clear size " <<LocalDataItemsMap.size() << endl;
+  //cout << "After clear size " <<LocalDataItemsMap.size() << endl;
   sendTransactionMap.clear();
   ccTransactionMap.clear();
   GlobalConflictsMap.clear();
@@ -134,6 +134,7 @@ void DFSUtil (int ccID, string v, map<string,bool> &visited) {
 void analyze(vector<Transaction> TransactionList) {
   std::set<string> AddressList;
 
+  Logger::instance().log(MSG+" AdjacencyMap starts", Logger::kLogLevelInfo);
   for (auto const& tx: TransactionList) {
     LocalConflictsMap[tx.fromAddress].push_back(tx.transactionID);
     LocalConflictsMap[tx.toAddress].push_back(tx.transactionID);
@@ -143,6 +144,7 @@ void analyze(vector<Transaction> TransactionList) {
     AddressList.insert(tx.fromAddress);
     AddressList.insert(tx.toAddress);
   }
+  Logger::instance().log(MSG+" AdjacencyMap ends", Logger::kLogLevelInfo);
 
   map<string,bool> visited;
 
@@ -157,8 +159,10 @@ void analyze(vector<Transaction> TransactionList) {
   for (auto const& address: AddressList) {
     if (visited[address] == false) {
       // print all reachable vertices
-      //cout << address << endl;  
+      //cout << address << endl;
+      Logger::instance().log(MSG+" DFSUtil starts", Logger::kLogLevelInfo);  
       DFSUtil(ccID,address,visited);
+      Logger::instance().log(MSG+" DFSUtil ends", Logger::kLogLevelInfo);
       //cout << ccID << "\t";
       
       if (ccTransactionMap[ccID].size() > 0) {
@@ -281,8 +285,9 @@ class MasterServiceHandler : virtual public MasterServiceIf {
 
     if (block.transactionsList.size() > 0) {
       cout << block.transactionsList.size() << endl;
+      Logger::instance().log(MSG+" Block "+block.miner+" analyze starts", Logger::kLogLevelInfo);
       analyze(block.transactionsList);
-
+      Logger::instance().log(MSG+" Block "+block.miner+" analyze ends", Logger::kLogLevelInfo);
       cout << endl;
       
       /*
@@ -318,14 +323,15 @@ class MasterServiceHandler : virtual public MasterServiceIf {
         td[thID].workerID = worker.workerID;
         td[thID].workerIP = worker.workerIP;
         td[thID].workerPort = worker.workerPort;
-        td[thID].miner = block.miner; 
+        td[thID].miner = block.miner;
+        Logger::instance().log(MSG+" Block "+to_string(block.number)+" thread " + to_string(thID) +" starts", Logger::kLogLevelInfo); 
         rc = pthread_create(&threads[thID], &attr, connectWorker, (void *)&td[thID]);
         
         if (rc) {
            cout << "Error:unable to create thread," << rc << endl;
            exit(-1);
         }
-        thID++;
+        thID = (thID+1) % NUM_THREADS;
       }
       
       // free attribute and wait for the other threads
@@ -340,6 +346,7 @@ class MasterServiceHandler : virtual public MasterServiceIf {
         
         cout << "Main: completed thread id :" << p ;
         cout << "  exiting with status :" << &status << endl;
+        Logger::instance().log(MSG+" Block "+to_string(block.number)+" thread " + to_string(td[thID].threadID) +" ends", Logger::kLogLevelInfo);
       }
                                                                                                                                                                                        
     }
@@ -364,7 +371,9 @@ class MasterServiceHandler : virtual public MasterServiceIf {
 
     printf("Block Processed\n");
     cout << "Clearing all global memories for next block creation" << endl;
+    Logger::instance().log(MSG+" Block "+to_string(block.number)+" clear_memory starts", Logger::kLogLevelInfo);
     clear_memory(); 
+    Logger::instance().log(MSG+" Block "+to_string(block.number)+" clear_memory ends", Logger::kLogLevelInfo);
   }
 };
 

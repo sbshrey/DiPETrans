@@ -32,6 +32,7 @@ using namespace ::SharedService;
 string MSG="MasterClient";
 
 int main(int argc, char const *argv[]) {
+  Logger::instance().log(MSG+" starts", Logger::kLogLevelInfo);
   clock_t t;
   double elapsed_time;
   // read ethereum_data.json
@@ -48,26 +49,30 @@ int main(int argc, char const *argv[]) {
   ethereum_data_file >> ethereum_data;
 
 	int port = atoi(argv[1]);
-	std::shared_ptr<TTransport> socket(new TSocket("localhost", port));
-	std::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
-	std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
-	MasterServiceClient client(protocol);
-  transport->open();
+	
     
   // range-based for
   //for (int i = start; i <= end; ++i) {
   for (auto& data: ethereum_data.items()) {
-    t = clock();
-    //string i_str = to_string(data.key());
-    std::cout << data.key() << '\t';
-
     Block block;
     block.number = stoi(data.key());//atoi(d.key().c_str());
     block.miner = data.value()["miner"];
-
+    std::cout << block.number << "\t";
     cout <<  data.value()["transactions"].size() << "\t";
     total_transactions+=data.value()["transactions"].size();
 
+
+    Logger::instance().log(MSG+" Block "+to_string(block.number)+" execution starts", Logger::kLogLevelInfo);
+    std::shared_ptr<TTransport> socket(new TSocket("localhost", port));
+    std::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
+    std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
+    MasterServiceClient client(protocol);
+    transport->open();
+    t = clock();
+    //string i_str = to_string(data.key());
+   
+
+    Logger::instance().log(MSG+" Block "+to_string(block.number)+" transactionsList starts", Logger::kLogLevelInfo);
     int16_t txid=0;
     for (auto& tx: data.value()["transactions"]) {
       Transaction transaction;
@@ -79,29 +84,38 @@ int main(int argc, char const *argv[]) {
       transaction.gasPrice = (double)tx["gasPrice"]; 
       block.transactionsList.push_back(transaction);
     }
+    Logger::instance().log(MSG+" Block "+to_string(block.number)+" transactionsList ends", Logger::kLogLevelInfo);
+
+
 
     cout << data.value()["unclesList"].size() << "\t";
-
+    Logger::instance().log(MSG+" Block "+to_string(block.number)+" unclesList starts", Logger::kLogLevelInfo);
     for (auto& u: data.value()["unclesList"]) {
       Uncle uncle;
       uncle.miner = u["miner"];
       uncle.number = u["number"];
       block.unclesList.push_back(uncle);
     }
+    Logger::instance().log(MSG+" Block "+to_string(block.number)+" unclesList ends", Logger::kLogLevelInfo);
 
-    cout << endl;
-    cout << block.transactionsList.size() << endl;
-    sleep(5);
+    //cout << endl;
+    //cout << block.transactionsList.size() << endl;
+    //sleep(5);
+    Logger::instance().log(MSG+" Block "+to_string(block.number)+" processBlock starts", Logger::kLogLevelInfo);
     client.processBlock(block);
-    sleep(5);
+    Logger::instance().log(MSG+" Block "+to_string(block.number)+" processBlock ends", Logger::kLogLevelInfo);
+    //sleep(5);
     //cin.get();
     //sleep(5);
     elapsed_time = (double) (clock() - t);
-    cout << (elapsed_time)/CLOCKS_PER_SEC;
+    cout << (elapsed_time)/CLOCKS_PER_SEC << "\n";
+    transport->close();
+    
+    Logger::instance().log(MSG+" Block "+to_string(block.number)+" execution ends", Logger::kLogLevelInfo);
   }
-  transport->close();
-  cout << total_transactions << endl;
-  
+  //cout << total_transactions << endl;
+  //cout << endl;
+  Logger::instance().log(MSG+" ends", Logger::kLogLevelInfo);
 
   return 0;
 }

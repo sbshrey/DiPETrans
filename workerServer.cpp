@@ -31,13 +31,15 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
  public:
   WorkerServiceHandler() {
     // Your initialization goes here
-      
+    int index = 1;  
       
   }
 
   void recvTransactions( ::SharedService::WorkerResponse& _return, const std::vector< ::SharedService::Transaction> & TransactionsList, const std::map<std::string, double> & AccountsList) {
     // Your implementation goes here
     //_return.free();
+    Logger::instance().log(MSG+" recvTransactions starts", Logger::kLogLevelInfo);
+
     printf("\n\nrecvTransactions\n");
     int successful_transactions = 0;
     int failed_transactions = 0;
@@ -45,11 +47,14 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
 
     double tx_fees = 0;
 
+    Logger::instance().log(MSG+" AccountsList starts", Logger::kLogLevelInfo);
     for (auto const& account: AccountsList)
     {
       _return.accountList[account.first] = account.second;
     }
+    Logger::instance().log(MSG+" AccountsList ends", Logger::kLogLevelInfo);
 
+    Logger::instance().log(MSG+" TransactionsList starts", Logger::kLogLevelInfo);
     for (auto const& tx: TransactionsList) {
       cout << tx.transactionID << "\t";
       double fee;
@@ -74,8 +79,10 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
       _return.transactionIDList.push_back(tx.transactionID);
       total_transactions++;
     }
-
     _return.transactionFees = tx_fees;
+    Logger::instance().log(MSG+" TransactionsList ends", Logger::kLogLevelInfo);
+
+    
 
     //cout << tx_fees << endl;
   
@@ -92,13 +99,12 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
     }
     cout << endl;
     */
-    cout << "Transactions Fees: " << _return.transactionFees << endl;
-
-    cout << "\nTotal: " << total_transactions << endl;
+    cout << "\nTransactions Fees: " << _return.transactionFees << endl;
+    cout << "Total: " << total_transactions << endl;
     cout << "Success: " << successful_transactions << endl;
     cout << "Failed: " << failed_transactions << endl;
     cout << endl;
-
+    Logger::instance().log(MSG+" recvTransactions ends", Logger::kLogLevelInfo);
     /*cout << TransactionsList.size() << endl;
     map<string,std::vector<int16_t>> txnOrder;
     //map<string,int64_t> accountValue;

@@ -57,6 +57,8 @@ int main(int argc, char const *argv[]) {
     Block block;
     block.number = stoi(data.key());//atoi(d.key().c_str());
     block.miner = data.value()["miner"];
+    //block.transactionsList.clear();
+    //block.unclesList.clear();
     std::cout << block.number << "\t";
     cout <<  data.value()["transactions"].size() << "\t";
     total_transactions+=data.value()["transactions"].size();

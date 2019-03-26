@@ -40,7 +40,7 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
     //_return.free();
     Logger::instance().log(MSG+" recvTransactions starts", Logger::kLogLevelInfo);
 
-    printf("\n\nrecvTransactions\n");
+    //printf("\n\nrecvTransactions\n");
     int successful_transactions = 0;
     int failed_transactions = 0;
     int total_transactions = 0;
@@ -56,7 +56,7 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
 
     Logger::instance().log(MSG+" TransactionsList starts", Logger::kLogLevelInfo);
     for (auto const& tx: TransactionsList) {
-      cout << tx.transactionID << "\t";
+      //cout << tx.transactionID << "\t";
       double fee;
 
       if (_return.accountList[tx.fromAddress] >= double(tx.value))
@@ -99,46 +99,12 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
     }
     cout << endl;
     */
-    cout << "\nTransactions Fees: " << _return.transactionFees << endl;
-    cout << "Total: " << total_transactions << endl;
-    cout << "Success: " << successful_transactions << endl;
-    cout << "Failed: " << failed_transactions << endl;
-    cout << endl;
+    //cout << "\nTransactions Fees: " << _return.transactionFees << endl;
+    cout << total_transactions << "\t";
+    cout << successful_transactions << "\t";
+    cout << failed_transactions << endl;
+    //cout << endl;
     Logger::instance().log(MSG+" recvTransactions ends", Logger::kLogLevelInfo);
-    /*cout << TransactionsList.size() << endl;
-    map<string,std::vector<int16_t>> txnOrder;
-    //map<string,int64_t> accountValue;
-    for (auto const& tx: TransactionsList) {
-      //printf("%d\n", tx.value);
-      cout << tx.transactionID << "\t" <<tx.fromAddress << "\t" << tx.toAddress << "\t" << tx.value << endl;
-      
-      // ToDo --> add logic to execute transaction
-      if (GlobalDataItemsMap[tx.fromAddress] > tx.value) {
-        GlobalDataItemsMap[tx.fromAddress] -= tx.value;
-        txnOrder[tx.fromAddress].push_back(tx.transactionID);
-        GlobalDataItemsMap[tx.toAddress] += tx.value;
-        //accountValue[tx.fromAddress] += (-1)*tx.value;
-        txnOrder[tx.toAddress].push_back(tx.transactionID);
-        //accountValue[tx.toAddress] += tx.value;
-      }
-      cout << tx.transactionID << "\t" << tx.fromAddress  
-           << "\t" << GlobalDataItemsMap[tx.fromAddress] 
-           << "\t" << tx.toAddress << "\t" 
-           << GlobalDataItemsMap[tx.toAddress] << endl;
-    }
-    //_return.clear();
-    for (std::map<string,int64_t>::iterator i = GlobalDataItemsMap.begin(); i != GlobalDataItemsMap.end(); ++i)
-    {
-      if (txnOrder[i->first].size() > 0)
-      {
-        
-        std::map<int64_t, std::vector<int16_t>> tmpMap;
-        tmpMap[i->second] = txnOrder[i->first];
-        //_return[i->first] = tmpMap;
-      }
-      
-    }*/
-
   }
 
 };

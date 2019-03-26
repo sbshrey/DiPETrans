@@ -61,7 +61,7 @@ void genesis() {
 	// iterate the array
 	for (json::iterator it = accounts.begin(); it != accounts.end(); ++it) {
 		DataItemsMap[it.key()] = it.value();
-		cout << it.key() << " " << it.value() << endl;
+		//cout << it.key() << " " << it.value() << endl;
 	}
 }
 
@@ -70,28 +70,30 @@ using json = nlohmann::json;
 
 int main(int argc, char const *argv[])
 {
+	//double t;
+
 	std::vector<Transaction> TransactionList;
 	//std::map<string, double> DataItemsMap;
 
 	//int start = stoi(argv[2]);
 	//int end = stoi(argv[3]);
 
-	cout << "Creating genesis state of data items.\n";
+	//cout << "Creating genesis state of data items.\n";
 	genesis();
-	cout << "Created genesis state of data items.\n";
+	//cout << "Created genesis state of data items.\n";
 
-	cout << "Saving genesis state starts.\n";
+	//cout << "Saving genesis state starts.\n";
 	saveDataItemsMap("logs/accounts/genesis.csv");
-	cout << "Saving genesis state ends.\n";
+	//cout << "Saving genesis state ends.\n";
 
 	//read data from file and store in memory
 	json ethereum_data;
 	//"data/ethereum_data_" +  + ".json"
-	cout << "reading ethereum_data_file starts.\n";
+	//cout << "reading ethereum_data_file starts.\n";
   	std::ifstream ethereum_data_file(argv[1]); 
 
   	ethereum_data_file >> ethereum_data;
-  	cout << "reading ethereum_data_file ends.\n";
+  	//cout << "reading ethereum_data_file ends.\n";
 	
   	Logger::instance().log("Serial Execution starts", Logger::kLogLevelInfo);
   	int64_t total_transactions = 0;
@@ -99,8 +101,10 @@ int main(int argc, char const *argv[])
   	int64_t failed_transactions = 0;
 
   	for (auto& data: ethereum_data.items()) {
+  		clock_t t = clock();
+  		double elapsed_time;
 	    //string i_str = to_string(i);
-	    cout << data.key() << endl;//<< "\t" << data[i_str]["transactions"].size();
+	    cout << data.key() << "\t" << data.value()["transactions"].size() << "\t" << data.value()["unclesList"].size() << "\t";//<< "\t" << data[i_str]["transactions"].size();
 	    Logger::instance().log("Block " + data.key() + " Block Execution starts", Logger::kLogLevelInfo);
 	    //cout << i;
 	    //std::cout << i_str << "\t" <<data[i_str] << '\n';
@@ -133,7 +137,7 @@ int main(int argc, char const *argv[])
         		DataItemsMap[tx["from"]] = DataItemsMap[tx["from"]] - double(tx["value"]) - fee;
         		//cout << "hello";
         		if (tx["to"].is_null()) {
-        			cout << "to" <<endl;
+        			//cout << "to" <<endl;
         			DataItemsMap[tx["to"]] = double(tx["value"]);
         		} else {
         			DataItemsMap[tx["to"]] = DataItemsMap[tx["to"]] + double(tx["value"]);
@@ -175,19 +179,22 @@ int main(int argc, char const *argv[])
 	    
 
     	DataItemsMap[block.miner] = DataItemsMap[block.miner] + (base_reward + tx_fees + uncle_reward);
+    	elapsed_time = (double) (clock() - t);
+    	cout << elapsed_time/CLOCKS_PER_SEC << endl;
     	//cout << i_str << "\t" << block.miner << "\t" << DataItemsMap[block.miner] << endl << endl;
-    	Logger::instance().log("Block " + data.key() + " saving DataItemsMap starts", Logger::kLogLevelInfo);
-		saveDataItemsMap("logs/accounts/block_"+data.key()+".csv");
-		Logger::instance().log("Block " + data.key() + " saving DataItemsMap ends", Logger::kLogLevelInfo);
-		
-
+    	//Logger::instance().log("Block " + data.key() + " saving DataItemsMap starts", Logger::kLogLevelInfo);
+		//saveDataItemsMap("logs/accounts/block_"+data.key()+".csv");
+		//Logger::instance().log("Block " + data.key() + " saving DataItemsMap ends", Logger::kLogLevelInfo);
     	Logger::instance().log("Block " + data.key() + " Block Execution ends", Logger::kLogLevelInfo);
+
+
 	}
 
 
-	cout << "\nTotal: " << total_transactions << endl;
-	cout << "Success: " << successful_transactions << endl;
-	cout << "Failed: " << failed_transactions << endl;
+
+	//cout << "\nTotal: " << total_transactions << endl;
+	//cout << "Success: " << successful_transactions << endl;
+	//cout << "Failed: " << failed_transactions << endl;
 	//cout << "Base Reward: " << base_reward << endl;
 	Logger::instance().log("Serial Execution ends", Logger::kLogLevelInfo);
 	

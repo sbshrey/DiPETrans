@@ -39,8 +39,8 @@
 #include "Logger.h"
 
 
-#define NUM_WORKERS 5
-#define NUM_THREADS 5
+//#define NUM_WORKERS 5
+//#define NUM_THREADS 5
 #define NUM_ACCOUNTS 50
 #define NUM_TRANSACTIONS 10
 #define RANDOM_SEED 10
@@ -78,6 +78,9 @@ map<int16_t,std::vector<WorkerResponse>> GlobalWorkerResponsesList;
 
 map<string,list<string>> AdjacencyMap;
 
+int NUM_WORKERS = 5;
+int NUM_THREADS = 5;
+
 const string MSG="MasterServer";
 const double base_reward = 3000000000000000000;
 
@@ -87,6 +90,7 @@ struct thread_data {
    string workerIP;
    int32_t workerPort;
    string miner;
+   int number;
 };
 
 
@@ -97,6 +101,152 @@ map<int16_t,vector<Transaction>> sendTransactionMap;
 
 //map<int16_t, set<string>> ccAddressMap;
 map<int16_t, set<int16_t>> ccTransactionMap;
+
+
+
+
+
+
+/*
+// Prototype of a utility function to swap two integers 
+void swap(int *x, int *y); 
+  
+// A class for Min Heap 
+class MinHeap 
+{ 
+    int *harr; // pointer to array of elements in heap 
+    int capacity; // maximum possible size of min heap 
+    int heap_size; // Current number of elements in min heap 
+public: 
+    // Constructor 
+    MinHeap(int capacity); 
+  
+    // to heapify a subtree with the root at given index 
+    void MinHeapify(int ); 
+  
+    int parent(int i) { return (i-1)/2; } 
+  
+    // to get index of left child of node at index i 
+    int left(int i) { return (2*i + 1); } 
+  
+    // to get index of right child of node at index i 
+    int right(int i) { return (2*i + 2); } 
+  
+    // to extract the root which is the minimum element 
+    int extractMin(); 
+  
+    // Decreases key value of key at index i to new_val 
+    void decreaseKey(int i, int new_val); 
+  
+    // Returns the minimum key (key at root) from min heap 
+    int getMin() { return harr[0]; } 
+  
+    // Deletes a key stored at index i 
+    void deleteKey(int i); 
+  
+    // Inserts a new key 'k' 
+    void insertKey(int k); 
+}; 
+  
+// Constructor: Builds a heap from a given array a[] of given size 
+MinHeap::MinHeap(int cap) 
+{ 
+    heap_size = 0; 
+    capacity = cap; 
+    harr = new int[cap]; 
+} 
+  
+// Inserts a new key 'k' 
+void MinHeap::insertKey(int k) 
+{ 
+    if (heap_size == capacity) 
+    { 
+        cout << "\nOverflow: Could not insertKey\n"; 
+        return; 
+    } 
+  
+    // First insert the new key at the end 
+    heap_size++; 
+    int i = heap_size - 1; 
+    harr[i] = k; 
+  
+    // Fix the min heap property if it is violated 
+    while (i != 0 && harr[parent(i)] > harr[i]) 
+    { 
+       swap(&harr[i], &harr[parent(i)]); 
+       i = parent(i); 
+    } 
+} 
+  
+// Decreases value of key at index 'i' to new_val.  It is assumed that 
+// new_val is smaller than harr[i]. 
+void MinHeap::decreaseKey(int i, int new_val) 
+{ 
+    harr[i] = new_val; 
+    while (i != 0 && harr[parent(i)] > harr[i]) 
+    { 
+       swap(&harr[i], &harr[parent(i)]); 
+       i = parent(i); 
+    } 
+} 
+  
+// Method to remove minimum element (or root) from min heap 
+int MinHeap::extractMin() 
+{ 
+    if (heap_size <= 0) 
+        return INT_MAX; 
+    if (heap_size == 1) 
+    { 
+        heap_size--; 
+        return harr[0]; 
+    } 
+  
+    // Store the minimum value, and remove it from heap 
+    int root = harr[0]; 
+    harr[0] = harr[heap_size-1]; 
+    heap_size--; 
+    MinHeapify(0); 
+  
+    return root; 
+} 
+  
+  
+// This function deletes key at index i. It first reduced value to minus 
+// infinite, then calls extractMin() 
+void MinHeap::deleteKey(int i) 
+{ 
+    decreaseKey(i, INT_MIN); 
+    extractMin(); 
+} 
+  
+// A recursive method to heapify a subtree with the root at given index 
+// This method assumes that the subtrees are already heapified 
+void MinHeap::MinHeapify(int i) 
+{ 
+    int l = left(i); 
+    int r = right(i); 
+    int smallest = i; 
+    if (l < heap_size && harr[l] < harr[i]) 
+        smallest = l; 
+    if (r < heap_size && harr[r] < harr[smallest]) 
+        smallest = r; 
+    if (smallest != i) 
+    { 
+        swap(&harr[i], &harr[smallest]); 
+        MinHeapify(smallest); 
+    } 
+} 
+  
+// A utility function to swap two elements 
+void swap(int *x, int *y) 
+{ 
+    int temp = *x; 
+    *x = *y; 
+    *y = temp; 
+} 
+
+*/
+
 
 
 void clear_memory() {
@@ -155,23 +305,66 @@ void analyze(vector<Transaction> TransactionList) {
 
   int ccID = 1;
   int id = 0;
+  int minID = 0;
+  /*
+  MinHeap h(NUM_WORKERS);
+  for (int i = 0; i < NUM_WORKERS; ++i)
+  {
+    h.insertKey(0);
+  }
+  */
 
   for (auto const& address: AddressList) {
     if (visited[address] == false) {
       // print all reachable vertices
       //cout << address << endl;
-      Logger::instance().log(MSG+" DFSUtil starts", Logger::kLogLevelInfo);  
+      //Logger::instance().log(MSG+" DFSUtil starts", Logger::kLogLevelInfo);  
       DFSUtil(ccID,address,visited);
-      Logger::instance().log(MSG+" DFSUtil ends", Logger::kLogLevelInfo);
+      //Logger::instance().log(MSG+" DFSUtil ends", Logger::kLogLevelInfo);
       //cout << ccID << "\t";
       
       if (ccTransactionMap[ccID].size() > 0) {
+        
         for (auto const& txid: ccTransactionMap[ccID]) {
           //cout << TransactionList[txid].transactionID << "\t";
+          // load balancing across workers 
+
           sendTransactionMap[WorkerList[id].workerID].push_back(TransactionList[txid]);
         }
+
+        if (ccID >= 5) {
+          map<int16_t,vector<Transaction>>::iterator it1;
+          map<int16_t,vector<Transaction>>::iterator it2;
+          for (it1 = sendTransactionMap.begin(); it1 != sendTransactionMap.end(); ++it1)
+          {
+            for (it2 = sendTransactionMap.begin() ; it2 != sendTransactionMap.end(); ++it2)
+            {
+              if (it1->second.size() > it2->second.size()) {
+                id = it2->first - 1;
+              }
+            }
+          }
+        } else {
+          id = (id+1)%NUM_WORKERS;
+        }
+        
         ccID++;
-        id = (id+1)%NUM_WORKERS;
+        /*
+        if (ccID > 5) {
+          if (sendTransactionMap[WorkerList[minID].workerID].size() < sendTransactionMap[WorkerList[id].workerID].size()) {
+
+          }
+        } else {
+          if (ccID >= 2) {
+            if (sendTransactionMap[WorkerList[minID].workerID].size() >= sendTransactionMap[WorkerList[id].workerID].size()) {
+              minID = id;
+            } 
+            else {
+              minID = id;
+            }
+          }
+          id = (id+1)%NUM_WORKERS;
+        }*/
         //cout << endl;
       }
 
@@ -186,9 +379,9 @@ void *connectWorker (void *threadarg) {
   struct thread_data *worker;
   worker = (struct thread_data *) threadarg;
 
-  cout << "Thread ID : " << worker->threadID << endl ;
+  
   //cout << " Message : " << my_data->message << endl;
-  Logger::instance().log(MSG+" thread "+ to_string(worker->workerID) +" starts", Logger::kLogLevelInfo);
+  Logger::instance().log(MSG+" Block "+to_string(worker->number) +" thread "+ to_string(worker->workerID) +" starts", Logger::kLogLevelInfo);
       
 
   std::shared_ptr<TTransport> socket(new TSocket(worker->workerIP, worker->workerPort));
@@ -196,24 +389,25 @@ void *connectWorker (void *threadarg) {
   std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
   WorkerServiceClient workerClient(protocol);
 
-  Logger::instance().log(MSG+" connection to worker "+to_string(worker->workerID)+" starts", Logger::kLogLevelInfo);
+  Logger::instance().log(MSG+" Block "+to_string(worker->number) +" connection to worker "+to_string(worker->workerID)+" starts", Logger::kLogLevelInfo);
   transport->open();
 
-  Logger::instance().log(MSG+" LocalDataItemsMap generation for worker "+to_string(worker->workerID)+" starts", Logger::kLogLevelInfo);
-  cout << "Size: " << sendTransactionMap[worker->workerID].size() << endl;
+  Logger::instance().log(MSG+" Block "+to_string(worker->number) +" LocalDataItemsMap generation for worker "+to_string(worker->workerID)+" starts", Logger::kLogLevelInfo);
+  
   for (auto& tx: sendTransactionMap[worker->workerID]) {
     LocalDataItemsMap[tx.fromAddress] = DataItemsMap[tx.fromAddress];
     LocalDataItemsMap[tx.toAddress] = DataItemsMap[tx.toAddress];
   }
-  Logger::instance().log(MSG+" LocalDataItemsMap generation for worker "+to_string(worker->workerID)+" ends", Logger::kLogLevelInfo);
+  Logger::instance().log(MSG+" Block "+to_string(worker->number) +" LocalDataItemsMap generation for worker "+to_string(worker->workerID)+" ends", Logger::kLogLevelInfo);
   
-  cout << "LocalDataItemsMap size: " << LocalDataItemsMap.size();
+  //cout << "LocalDataItemsMap size: " << LocalDataItemsMap.size();
   //LocalDataItemsMap.clear();
-  Logger::instance().log(MSG+" "+to_string(worker->workerID)+" recvTransactions() starts", Logger::kLogLevelInfo);
-  printf("Sending transactionsList and LocalDataItemsMap to worker nodes\n");
+  Logger::instance().log(MSG+" Block "+to_string(worker->number) +" WorkerID "+to_string(worker->workerID)+" recvTransactions() starts", Logger::kLogLevelInfo);
+  //printf("Sending transactionsList and LocalDataItemsMap to worker nodes\n");
   WorkerResponse LocalWorkerResponse;    
   workerClient.recvTransactions(LocalWorkerResponse,sendTransactionMap[worker->workerID],LocalDataItemsMap); // returns local worker response
-  Logger::instance().log(MSG+" "+to_string(worker->workerID)+" recvTransactions() ends", Logger::kLogLevelInfo);
+  cout << worker->threadID << ":" << sendTransactionMap[worker->workerID].size() << "\t";
+  Logger::instance().log(MSG+" Block "+to_string(worker->number) +" WorkerID "+to_string(worker->workerID)+" recvTransactions() ends", Logger::kLogLevelInfo);
   
   map<string,double>::iterator it;
   for (it = LocalWorkerResponse.accountList.begin(); it != LocalWorkerResponse.accountList.end(); ++it)
@@ -232,11 +426,11 @@ void *connectWorker (void *threadarg) {
   //GlobalWorkerResponsesList[worker->workerID] = LocalWorkerResponse;
   //GlobalDataItemsMap[worker->workerID] = WorkerResponse;
   //cout <<  "GlobalDataItemsMap size: " << GlobalDataItemsMap[worker->workerID].size() << endl;
-  printf("\nclosing transport at Master\n\n");
+  //printf("\nclosing transport at Master\n\n");
   //sleep(5);
   transport->close();
-  Logger::instance().log(MSG+" connection to worker "+to_string(worker->workerID)+" ends", Logger::kLogLevelInfo);
-  Logger::instance().log(MSG+" thread "+ to_string(worker->workerID) +" ends", Logger::kLogLevelInfo);
+  Logger::instance().log(MSG+" Block "+to_string(worker->number) +" connection to worker "+to_string(worker->workerID)+" ends", Logger::kLogLevelInfo);
+  Logger::instance().log(MSG+" Block "+to_string(worker->number) +" thread "+ to_string(worker->workerID) +" ends", Logger::kLogLevelInfo);
       
   //sleep(5);
   pthread_exit(&worker->threadID);
@@ -278,7 +472,7 @@ class MasterServiceHandler : virtual public MasterServiceIf {
   void processBlock(const Block& block) {
     // Your implementation goes here
     cout << endl;
-    cout << "Block: " << block.number << "\t" << block.miner << endl;
+    cout << block.number << "\t" << block.transactionsList.size() << "\t";
     
     double uncle_reward = 0;
 
@@ -286,11 +480,10 @@ class MasterServiceHandler : virtual public MasterServiceIf {
     //cout << "Size: " << block.transactionsList.size() << endl;
 
     if (block.transactionsList.size() > 0) {
-      cout << block.transactionsList.size() << endl;
-      Logger::instance().log(MSG+" Block "+block.miner+" analyze starts", Logger::kLogLevelInfo);
+      Logger::instance().log(MSG+" Block "+to_string(block.number)+" analyze starts", Logger::kLogLevelInfo);
       analyze(block.transactionsList);
-      Logger::instance().log(MSG+" Block "+block.miner+" analyze ends", Logger::kLogLevelInfo);
-      cout << endl;
+      Logger::instance().log(MSG+" Block "+to_string(block.number)+" analyze ends", Logger::kLogLevelInfo);
+      //cout << endl;
       
       /*
       cout << "Printing sendTransactionMap" << endl;
@@ -320,17 +513,19 @@ class MasterServiceHandler : virtual public MasterServiceIf {
       pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
       for (auto const& worker : WorkerList) {
-        cout <<"sendTransactions() : creating thread, " << thID << endl;
+        //cout <<"sendTransactions() : creating thread, " << thID << endl;
         td[thID].threadID = thID;
         td[thID].workerID = worker.workerID;
         td[thID].workerIP = worker.workerIP;
         td[thID].workerPort = worker.workerPort;
         td[thID].miner = block.miner;
+        td[thID].number = block.number;
+
         Logger::instance().log(MSG+" Block "+to_string(block.number)+" thread " + to_string(thID) +" starts", Logger::kLogLevelInfo); 
         rc = pthread_create(&threads[thID], &attr, connectWorker, (void *)&td[thID]);
         
         if (rc) {
-           cout << "Error:unable to create thread," << rc << endl;
+           //cout << "Error:unable to create thread," << rc << endl;
            exit(-1);
         }
         thID = (thID+1) % NUM_THREADS;
@@ -342,12 +537,12 @@ class MasterServiceHandler : virtual public MasterServiceIf {
       for(int p = 0; p < NUM_THREADS; p++ ) {
         rc = pthread_join(threads[p], &status);
         if (rc) {
-           cout << "Error:unable to join," << rc << endl;
+           //cout << "Error:unable to join," << rc << endl;
            exit(-1);
         }
         
-        cout << "Main: completed thread id :" << p ;
-        cout << "  exiting with status :" << &status << endl;
+        //cout << "Main: completed thread id :" << p ;
+        //cout << "  exiting with status :" << &status << endl;
         Logger::instance().log(MSG+" Block "+to_string(block.number)+" thread " + to_string(td[thID].threadID) +" ends", Logger::kLogLevelInfo);
       }
                                                                                                                                                                                        
@@ -363,16 +558,16 @@ class MasterServiceHandler : virtual public MasterServiceIf {
       DataItemsMap[uncle.miner] = DataItemsMap[uncle.miner] + ((ubn+8-block.number) * base_reward)/8;
       uncle_reward += (base_reward/32);
       //cout << block.number << "\t" << base_reward << endl;
-      cout << "uncle: " << ubn << " reward:" << uncle_reward << "," << (block.number-ubn) << " ," << ((ubn+8-block.number) * base_reward)/8 << endl;
+      //cout << "uncle: " << ubn << " reward:" << uncle_reward << "," << (block.number-ubn) << " ," << ((ubn+8-block.number) * base_reward)/8 << endl;
     }
     Logger::instance().log("Block " + to_string(block.number) + " Uncles Execution ends", Logger::kLogLevelInfo);
 
-    cout << "Adding block reward" << endl;
+    //cout << "Adding block reward" << endl;
 
     DataItemsMap[block.miner] = DataItemsMap[block.miner] + (base_reward + uncle_reward);
 
-    printf("Block Processed\n");
-    cout << "Clearing all global memories for next block creation" << endl;
+    //printf("Block Processed\n");
+    //cout << "Clearing all global memories for next block creation" << endl;
     Logger::instance().log(MSG+" Block "+to_string(block.number)+" clear_memory starts", Logger::kLogLevelInfo);
     clear_memory(); 
     Logger::instance().log(MSG+" Block "+to_string(block.number)+" clear_memory ends", Logger::kLogLevelInfo);
@@ -384,7 +579,8 @@ int main(int argc, char **argv) {
   Logger::instance().log(MSG+" starts", Logger::kLogLevelInfo);
   
   int port = atoi(argv[1]);
-  
+  NUM_THREADS = atoi(argv[2]);
+  NUM_WORKERS = NUM_THREADS;
   ::apache::thrift::stdcxx::shared_ptr<MasterServiceHandler> handler(new MasterServiceHandler());
   ::apache::thrift::stdcxx::shared_ptr<TProcessor> processor(new MasterServiceProcessor(handler));
   ::apache::thrift::stdcxx::shared_ptr<TServerTransport> serverTransport(new TServerSocket(port));

@@ -100,7 +100,10 @@ int main(int argc, char const *argv[])
   	int64_t successful_transactions = 0;
   	int64_t failed_transactions = 0;
 
+
+
   	for (auto& data: ethereum_data.items()) {
+  		auto start = chrono::steady_clock::now();
   		clock_t t = clock();
   		double elapsed_time;
 	    //string i_str = to_string(i);
@@ -131,6 +134,10 @@ int main(int argc, char const *argv[])
         	double fee;
         	//cout << "from" << tx["from"] << endl;
         	//cout << "to" << tx["to"] << endl;
+        	
+        	// verify transaction
+
+
         	if (DataItemsMap[tx["from"]] >= double(tx["value"]))
         	{
         		fee = (double)tx["gasPrice"] * (double)tx["gas"];
@@ -179,8 +186,10 @@ int main(int argc, char const *argv[])
 	    
 
     	DataItemsMap[block.miner] = DataItemsMap[block.miner] + (base_reward + tx_fees + uncle_reward);
-    	elapsed_time = (double) (clock() - t);
-    	cout << elapsed_time/CLOCKS_PER_SEC << endl;
+    	auto end = chrono::steady_clock::now();
+    	//elapsed_time = (double) (clock() - t);
+    	//cout << elapsed_time/CLOCKS_PER_SEC << endl;
+    	cout << chrono::duration_cast<chrono::microseconds>(end - start).count() << endl;
     	//cout << i_str << "\t" << block.miner << "\t" << DataItemsMap[block.miner] << endl << endl;
     	//Logger::instance().log("Block " + data.key() + " saving DataItemsMap starts", Logger::kLogLevelInfo);
 		//saveDataItemsMap("logs/accounts/block_"+data.key()+".csv");

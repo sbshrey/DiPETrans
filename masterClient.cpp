@@ -53,7 +53,14 @@ int main(int argc, char const *argv[]) {
     
   // range-based for
   //for (int i = start; i <= end; ++i) {
+  std::shared_ptr<TTransport> socket(new TSocket("localhost", port));
+  std::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
+  std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
+  MasterServiceClient client(protocol);
+  transport->open();
+  
   for (auto& data: ethereum_data.items()) {
+    auto start = chrono::steady_clock::now();
     Block block;
     block.number = stoi(data.key());//atoi(d.key().c_str());
     block.miner = data.value()["miner"];
@@ -65,11 +72,6 @@ int main(int argc, char const *argv[]) {
 
 
     Logger::instance().log(MSG+" Block "+to_string(block.number)+" execution starts", Logger::kLogLevelInfo);
-    std::shared_ptr<TTransport> socket(new TSocket("localhost", port));
-    std::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
-    std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
-    MasterServiceClient client(protocol);
-    transport->open();
     t = clock();
     //string i_str = to_string(data.key());
    
@@ -104,17 +106,24 @@ int main(int argc, char const *argv[]) {
     //cout << block.transactionsList.size() << endl;
     //sleep(5);
     Logger::instance().log(MSG+" Block "+to_string(block.number)+" processBlock starts", Logger::kLogLevelInfo);
+    //int64_t start = std::chrono::duration_cast<std::chrono::microseconds>(
+    //    std::chrono::system_clock::now().time_since_epoch()).count();
     client.processBlock(block);
+    //int64_t end = std::chrono::duration_cast<std::chrono::microseconds>(
+    //    std::chrono::system_clock::now().time_since_epoch()).count();
     Logger::instance().log(MSG+" Block "+to_string(block.number)+" processBlock ends", Logger::kLogLevelInfo);
     //sleep(5);
     //cin.get();
     //sleep(5);
-    elapsed_time = (double) (clock() - t);
-    cout << (elapsed_time)/CLOCKS_PER_SEC << "\n";
-    transport->close();
+    //elapsed_time = (double) (clock() - t);
+    //cout << (elapsed_time)/CLOCKS_PER_SEC << "\n";
     
+    auto end = chrono::steady_clock::now();
+    cout << chrono::duration_cast<chrono::microseconds>(end - start).count() << endl;
+
     Logger::instance().log(MSG+" Block "+to_string(block.number)+" execution ends", Logger::kLogLevelInfo);
   }
+  transport->close();
   //cout << total_transactions << endl;
   //cout << endl;
   Logger::instance().log(MSG+" ends", Logger::kLogLevelInfo);

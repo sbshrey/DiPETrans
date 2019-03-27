@@ -25,7 +25,10 @@ using namespace  ::WorkerService;
 using namespace  ::SharedService;
 
 std::map<string, int64_t> GlobalDataItemsMap;
+
+string WID = "1";
 string MSG="WorkerServer";
+
 
 class WorkerServiceHandler : virtual public WorkerServiceIf {
  public:
@@ -38,8 +41,8 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
   void recvTransactions( ::SharedService::WorkerResponse& _return, const std::vector< ::SharedService::Transaction> & TransactionsList, const std::map<std::string, double> & AccountsList) {
     // Your implementation goes here
     //_return.free();
-    Logger::instance().log(MSG+" recvTransactions starts", Logger::kLogLevelInfo);
-
+    Logger::instance().log(MSG+" worker "+ WID +" recvTransactions starts", Logger::kLogLevelInfo);
+    auto start = chrono::steady_clock::now();
     //printf("\n\nrecvTransactions\n");
     int successful_transactions = 0;
     int failed_transactions = 0;
@@ -100,17 +103,22 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
     cout << endl;
     */
     //cout << "\nTransactions Fees: " << _return.transactionFees << endl;
+    
+    //cout << endl;
+    Logger::instance().log(MSG+" worker "+ WID +" recvTransactions ends", Logger::kLogLevelInfo);
+    auto end = chrono::steady_clock::now();
+    cout << chrono::duration_cast<chrono::microseconds>(end - start).count() << "\t";
     cout << total_transactions << "\t";
     cout << successful_transactions << "\t";
     cout << failed_transactions << endl;
-    //cout << endl;
-    Logger::instance().log(MSG+" recvTransactions ends", Logger::kLogLevelInfo);
   }
 
 };
 
 int main(int argc, char **argv) {
   int port = atoi(argv[1]);
+  WID = argv[2];
+
   ::apache::thrift::stdcxx::shared_ptr<WorkerServiceHandler> handler(new WorkerServiceHandler());
   ::apache::thrift::stdcxx::shared_ptr<TProcessor> processor(new WorkerServiceProcessor(handler));
   ::apache::thrift::stdcxx::shared_ptr<TServerTransport> serverTransport(new TServerSocket(port));

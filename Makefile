@@ -1,4 +1,4 @@
-CXX = g++ -std=c++11 -g 
+CXX = g++ -std=c++11 -g -O3
 LFLAGS = -lthrift -lpthread
 MSTARGET = masterServer
 WSTARGET = workerServer

@@ -8,6 +8,14 @@
 #include <algorithm>  //for std::generate_n
 #include "Logger.h"
 
+
+//#include <CkCrypt2.h>
+//#include <CkPrivateKey.h>
+//#include <CkPrng.h>
+//#include <CkEcc.h>
+//#include <CkPublicKey.h>
+
+
 using json = nlohmann::json;
 
 using namespace std;
@@ -23,6 +31,10 @@ struct Transaction
 	string to_address;
 	string from_address;
 	double value;
+	string hash;
+	string r;
+	string s;
+	int8_t v;
 };
 
 struct Block
@@ -38,6 +50,15 @@ struct Block
 
 std::map<string, double> DataItemsMap;
 
+/*
+bool verifyECDSA(string pubkey, string hash,string r,string s,int8_t v) {
+	cout << hash << endl;
+	cout << r << endl;
+	cout << s << endl;
+	cout << v << endl;
+	return true
+
+}*/
 
 void saveDataItemsMap(string filename) {
 	ofstream accountsFile(filename);
@@ -114,8 +135,11 @@ int main(int argc, char const *argv[])
 	    Block block;
 	    //cout << data["0"]["timestamp"];
 	    block.timestamp = data.value()["timestamp"];
+	    //cout << block.timestamp << "\t";
 	    block.number = stoi(data.key());//atoi(d.key().c_str());
+	    //cout << block.number << "\t";
 	    block.miner = data.value()["miner"];
+		//cout << block.miner << "\t";
 	    //block.gasLimit = data[i_str]["gasLimit"]
 	    //block.gasUsed = data[i_str]["gasUsed"]
 	    //block.transaction_count = data[i_str]["transaction_count"];
@@ -137,6 +161,13 @@ int main(int argc, char const *argv[])
         	
         	// verify transaction
 
+        	//cout << tx["hash"];
+	    	//cout << tx["r"];
+	    	//cout << tx["s"];
+	    	//cout << tx["v"];
+
+
+	    	//verifyECDSA(tx["publickey"], tx["hash"],tx["r"],tx["s"],stoi(tx["v"]));
 
         	if (DataItemsMap[tx["from"]] >= double(tx["value"]))
         	{

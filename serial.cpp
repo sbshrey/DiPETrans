@@ -9,6 +9,10 @@
 #include "Logger.h"
 
 
+#include <openssl/sha.h>
+#include <sstream>
+#include <iomanip>
+
 //#include <CkCrypt2.h>
 //#include <CkPrivateKey.h>
 //#include <CkPrng.h>
@@ -22,33 +26,38 @@ using namespace std;
 
 
 struct Uncle {
-	string address;
+	string miner;
 	int64_t number;
 };
 
 struct Transaction
 {
-	string to_address;
-	string from_address;
+	int16_t transactionID;
+	string toAddress;
+	string fromAddress;
 	double value;
-	string hash;
-	string r;
-	string s;
-	int8_t v;
+	double gas;
+	double gasPrice;
 };
 
 struct Block
 {
 	string timestamp;
+	int64_t nonce;
+	string prevHash;
+	//string hash;
 	int64_t number;
 	string miner;
-	int16_t transaction_count;
-	std::vector<Transaction> transaction_list;	
+	//int16_t transaction_count;
+	std::vector<Transaction> transactionsList;
+	std::vector<Uncle> unclesList;	
 };
 
 
 
 std::map<string, double> DataItemsMap;
+
+std::vector<Block> blockchain;
 
 /*
 bool verifyECDSA(string pubkey, string hash,string r,string s,int8_t v) {
@@ -59,6 +68,93 @@ bool verifyECDSA(string pubkey, string hash,string r,string s,int8_t v) {
 	return true
 
 }*/
+
+// string = 34333131353030636165623163363738613765326135633832326335343235623964633533323864653364303365393864656663363732643932323237656132;
+
+string difficulty = "00011111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111";
+
+
+// string difficulty = "00111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111";
+
+
+string sha256(const string str) {
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256_CTX sha256;
+    SHA256_Init(&sha256);
+    SHA256_Update(&sha256, str.c_str(), str.size());
+    SHA256_Final(hash, &sha256);
+    //cout << "hash" << hash << endl;
+    stringstream ss;
+    for(int i = 0; i < SHA256_DIGEST_LENGTH; i++)
+    {
+        ss << hex << setw(2) << setfill('0') << (int)hash[i];
+    }
+    return ss.str();
+}
+
+
+string convert_block_to_string(Block block) {
+	string str = "";
+	str.append(block.timestamp);
+	str.append(to_string(block.nonce));
+	str.append(block.prevHash);
+	str.append(to_string(block.number));
+	str.append(block.miner);
+
+	for (auto& tx : block.transactionsList) {
+		str.append(to_string(tx.transactionID));
+		str.append(tx.toAddress);
+		str.append(tx.fromAddress);
+		str.append(to_string(tx.value));
+		str.append(to_string(tx.gas));
+		str.append(to_string(tx.gasPrice));
+	}
+
+	for (auto& u : block.unclesList) {
+		str.append(u.miner);
+		str.append(to_string(u.number));
+	}
+
+	return str;
+	//str.append(block.transaction_count);
+}
+
+string mine(Block block) {
+
+	block.nonce = 0;
+	
+	//cout << (char*)&block;
+
+	
+	//cout << block_str << endl;
+
+	// serial search for nonce
+	//const string ibuf = "compute sha1";
+    //unsigned char obuf[20];
+	string hash;
+	while (true) {
+		string block_str = convert_block_to_string(block);
+		hash = sha256(block_str);
+		if (hash.compare(difficulty) < 0) {
+			cout << block.nonce << "\n";
+			break;
+		}
+
+	    block.nonce++;
+	}
+    // hash = sha256(block_str); //, strlen(ibuf), obuf);
+
+    //int i;
+    //cout << block.nonce << "\n";
+    //printf("Ox");
+    //cout << hash << endl;
+    /*for (i = 0; i < hash.size(); i++) {
+        printf("%02x", hash[i]);
+    }*/
+    //printf("\n");
+	return hash;
+}
+
 
 void saveDataItemsMap(string filename) {
 	ofstream accountsFile(filename);
@@ -93,7 +189,7 @@ int main(int argc, char const *argv[])
 {
 	//double t;
 
-	std::vector<Transaction> TransactionList;
+	//std::vector<Transaction> TransactionList;
 	//std::map<string, double> DataItemsMap;
 
 	//int start = stoi(argv[2]);
@@ -124,6 +220,7 @@ int main(int argc, char const *argv[])
 
 
   	for (auto& data: ethereum_data.items()) {
+
   		auto start = chrono::steady_clock::now();
   		clock_t t = clock();
   		double elapsed_time;
@@ -139,6 +236,10 @@ int main(int argc, char const *argv[])
 	    block.number = stoi(data.key());//atoi(d.key().c_str());
 	    //cout << block.number << "\t";
 	    block.miner = data.value()["miner"];
+
+	    // running for originial ethrereum difficulty
+	    if (block.number > 4370100) break;
+
 		//cout << block.miner << "\t";
 	    //block.gasLimit = data[i_str]["gasLimit"]
 	    //block.gasUsed = data[i_str]["gasUsed"]
@@ -154,6 +255,7 @@ int main(int argc, char const *argv[])
 	    //std::vector<Transaction> txnList;
 	    Logger::instance().log("Block " + data.key() + " Transactions Execution starts", Logger::kLogLevelInfo);
 	    
+	    int16_t txid=0;
 		for (auto& tx : data.value()["transactions"]) {
         	double fee;
         	//cout << "from" << tx["from"] << endl;
@@ -166,6 +268,14 @@ int main(int argc, char const *argv[])
 	    	//cout << tx["s"];
 	    	//cout << tx["v"];
 
+        	Transaction transaction;
+      		transaction.transactionID = txid++;
+      		transaction.fromAddress = tx["from"];
+      		transaction.toAddress = tx["to"];
+      		transaction.value = (double)tx["value"];
+      		transaction.gas = (double)tx["gas"];
+      		transaction.gasPrice = (double)tx["gasPrice"]; 
+      		block.transactionsList.push_back(transaction);
 
 	    	//verifyECDSA(tx["publickey"], tx["hash"],tx["r"],tx["s"],stoi(tx["v"]));
 
@@ -206,8 +316,16 @@ int main(int argc, char const *argv[])
     	//cout << data[i_str]
     	//cout << "UnclesList"
         for (auto& uncle: data.value()["unclesList"]) {
+        	
+        	Uncle u;
+      		u.miner = uncle["miner"];
+      		u.number = uncle["number"];
+      		block.unclesList.push_back(u);
+
+
         	int ubn = uncle["number"];
         	//cout << ubn << endl;
+
         	DataItemsMap[uncle["miner"]] = DataItemsMap[uncle["miner"]] + ((ubn+8-block.number) * base_reward)/8;
         	uncle_reward += (base_reward/32);
         	//cout << i_str << "\t" << base_reward << endl;
@@ -217,16 +335,33 @@ int main(int argc, char const *argv[])
 	    
 
     	DataItemsMap[block.miner] = DataItemsMap[block.miner] + (base_reward + tx_fees + uncle_reward);
-    	auto end = chrono::steady_clock::now();
-    	//elapsed_time = (double) (clock() - t);
-    	//cout << elapsed_time/CLOCKS_PER_SEC << endl;
-    	cout << chrono::duration_cast<chrono::microseconds>(end - start).count() << endl;
+    	
     	//cout << i_str << "\t" << block.miner << "\t" << DataItemsMap[block.miner] << endl << endl;
     	//Logger::instance().log("Block " + data.key() + " saving DataItemsMap starts", Logger::kLogLevelInfo);
 		//saveDataItemsMap("logs/accounts/block_"+data.key()+".csv");
 		//Logger::instance().log("Block " + data.key() + " saving DataItemsMap ends", Logger::kLogLevelInfo);
-    	Logger::instance().log("Block " + data.key() + " Block Execution ends", Logger::kLogLevelInfo);
+    	
 
+    	auto end1 = chrono::steady_clock::now();
+    	//elapsed_time = (double) (clock() - t);
+    	//cout << elapsed_time/CLOCKS_PER_SEC << endl;
+    	cout << chrono::duration_cast<chrono::microseconds>(end1 - start).count() << "\t";
+
+    	Logger::instance().log("Block " + data.key() + " Block Mining starts", Logger::kLogLevelInfo);
+
+    	// Adding Block to Blockchain
+    	//cout << "\nAdded block " << block.number << "\n";
+    	string block_hash = "0000000000000000000000000000000000000000000000000000000000000000";
+    	block.prevHash = block_hash;
+    	block_hash = mine(block);
+    	blockchain.push_back(block);
+
+    	Logger::instance().log("Block " + data.key() + " Block Mining ends", Logger::kLogLevelInfo);
+    	auto end2 = chrono::steady_clock::now();
+    	//elapsed_time = (double) (clock() - t);
+    	//cout << elapsed_time/CLOCKS_PER_SEC << endl;
+    	cout << chrono::duration_cast<chrono::microseconds>(end2 - end1).count() << "\t" << chrono::duration_cast<chrono::microseconds>(end2 - start).count() << endl;
+    	Logger::instance().log("Block " + data.key() + " Block Execution ends", Logger::kLogLevelInfo);
 
 	}
 

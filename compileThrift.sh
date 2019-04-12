@@ -1,3 +1,3 @@
-thrift -r --gen cpp --gen py MasterService.thrift
-thrift -r --gen cpp --gen py WorkerService.thrift
-thrift -r --gen cpp --gen py SharedService.thrift
+thrift -r --gen cpp MasterService.thrift
+thrift -r --gen cpp WorkerService.thrift
+thrift -r --gen cpp SharedService.thrift

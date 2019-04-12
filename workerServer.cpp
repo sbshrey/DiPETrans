@@ -9,10 +9,18 @@
 #include <thrift/server/TSimpleServer.h>
 #include <thrift/transport/TServerSocket.h>
 #include <thrift/transport/TBufferTransports.h>
+#include <thrift/transport/TSocket.h>
+#include <thrift/concurrency/ThreadManager.h>
+#include <thrift/server/TThreadPoolServer.h>
+#include <thrift/concurrency/PosixThreadFactory.h>
 
 #include "Logger.h"
 #include <iostream>
 
+
+#include <openssl/sha.h>
+#include <sstream>
+#include <iomanip>
 
 
 using namespace std;
@@ -20,7 +28,9 @@ using namespace ::apache::thrift;
 using namespace ::apache::thrift::protocol;
 using namespace ::apache::thrift::transport;
 using namespace ::apache::thrift::server;
+using namespace ::apache::thrift::concurrency;
 
+using namespace  ::MasterService;
 using namespace  ::WorkerService;
 using namespace  ::SharedService;
 
@@ -29,12 +39,95 @@ std::map<string, int64_t> GlobalDataItemsMap;
 string WID = "1";
 string MSG="WorkerServer";
 
+int masterPort = 9090;
+string masterIP = "localhost";
+
+
+string difficulty = "00011111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111";
+
+
+//string difficulty = "00111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111";
+
+
+string sha256(const string str) {
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256_CTX sha256;
+    SHA256_Init(&sha256);
+    SHA256_Update(&sha256, str.c_str(), str.size());
+    SHA256_Final(hash, &sha256);
+    //cout << "hash" << hash << endl;
+    stringstream ss;
+    for(int i = 0; i < SHA256_DIGEST_LENGTH; i++)
+    {
+        ss << hex << setw(2) << setfill('0') << (int)hash[i];
+    }
+    return ss.str();
+}
+
+
+string convert_block_to_string(Block block) {
+  string str = "";
+  str.append(block.timestamp);
+  str.append(to_string(block.nonce));
+  str.append(block.prevHash);
+  str.append(to_string(block.number));
+  str.append(block.miner);
+
+  for (auto& tx : block.transactionsList) {
+    str.append(to_string(tx.transactionID));
+    str.append(tx.toAddress);
+    str.append(tx.fromAddress);
+    str.append(to_string(tx.value));
+    str.append(to_string(tx.gas));
+    str.append(to_string(tx.gasPrice));
+  }
+
+  for (auto& u : block.unclesList) {
+    str.append(u.miner);
+    str.append(to_string(u.number));
+  }
+
+  return str;
+  //str.append(block.transaction_count);
+}
+
+
+Block createBlock(Block b) {
+    Block block;
+    block.number = b.number; //stoi(data.key());//atoi(d.key().c_str());
+    block.timestamp = b.timestamp; // data.value["timestamp"];
+    block.nonce = b.nonce;
+    block.prevHash = b.prevHash; //"0000000000000000000000000000000000000000000000000000000000000000";
+    block.miner = b.miner; // data.value()["miner"];
+    //block.transactionsList.clear();
+    //block.unclesList.clear();
+    for (auto& tx: b.transactionsList) {
+      Transaction transaction;
+      transaction.transactionID = tx.transactionID;
+      transaction.fromAddress = tx.fromAddress;
+      transaction.toAddress = tx.toAddress;
+      transaction.value = tx.value;
+      transaction.gas = tx.gas; // (double)tx["gas"];
+      transaction.gasPrice = tx.gasPrice; // (double)tx["gasPrice"]; 
+      block.transactionsList.push_back(transaction);
+    }
+
+    for (auto& u: b.unclesList) {
+      Uncle uncle;
+      uncle.miner = u.miner;
+      uncle.number = u.number;
+      block.unclesList.push_back(uncle);
+    }
+    return block;
+}
+
 
 class WorkerServiceHandler : virtual public WorkerServiceIf {
  public:
   WorkerServiceHandler() {
     // Your initialization goes here
     int index = 1;  
+    
       
   }
 
@@ -85,7 +178,7 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
     _return.transactionFees = tx_fees;
     Logger::instance().log(MSG+" TransactionsList ends", Logger::kLogLevelInfo);
 
-    
+    // TODO: Add block number in logs
 
     //cout << tx_fees << endl;
   
@@ -110,8 +203,57 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
     cout << chrono::duration_cast<chrono::microseconds>(end - start).count() << "\t";
     cout << total_transactions << "\t";
     cout << successful_transactions << "\t";
-    cout << failed_transactions << endl;
+    cout << failed_transactions << "\t";
   }
+
+
+  void mineBlock(const  ::MasterService::Block& block, const int16_t nonce, const int16_t interval) {
+    // Your implementation goes here
+    //block.nonce = nonce;
+    Block newBlock = createBlock(block);
+
+    newBlock.nonce = nonce;
+    string hash;
+    while (true) {
+      string block_str = convert_block_to_string(newBlock);
+      hash = sha256(block_str);
+      if (hash.compare(difficulty) < 0) {
+        cout << newBlock.nonce << endl;
+        break;
+      }
+
+      newBlock.nonce+=interval;
+    }
+  
+    
+    std::shared_ptr<TTransport> socket(new TSocket(masterIP, masterPort));
+    std::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
+    std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
+    MasterServiceClient masterClient(protocol);
+
+    Logger::instance().log(MSG+" Block "+to_string(block.number) +" connection to master "+WID+" starts", Logger::kLogLevelInfo);
+    transport->open();
+
+
+    Logger::instance().log(MSG+" Block "+to_string(block.number) +" worker "+WID+" mineBlock() starts", Logger::kLogLevelInfo);
+
+    // sent transaction to execute     
+    
+    masterClient.recvMiningStatus(newBlock.nonce, newBlock.number); // returns local worker response
+    //cout << worker->threadID << ":" << sendTransactionMap[worker->workerID].size() << "\t";
+
+    Logger::instance().log(MSG+" Block "+to_string(block.number) +" WorkerID "+WID+" mineBlock() ends", Logger::kLogLevelInfo);
+    
+    transport->close();
+    Logger::instance().log(MSG+" Block "+to_string(block.number) +" connection to master "+WID+" ends", Logger::kLogLevelInfo);
+    
+
+    //_return.number = newBlock.number;
+    //_return.nonce = newBlock.nonce;
+
+    //printf("mineBlock\n");
+  }
+
 
 };
 
@@ -125,7 +267,12 @@ int main(int argc, char **argv) {
   ::apache::thrift::stdcxx::shared_ptr<TTransportFactory> transportFactory(new TBufferedTransportFactory());
   ::apache::thrift::stdcxx::shared_ptr<TProtocolFactory> protocolFactory(new TBinaryProtocolFactory());
 
-  TSimpleServer server(processor, serverTransport, transportFactory, protocolFactory);
+  shared_ptr<ThreadManager> threadManager = ThreadManager::newSimpleThreadManager(5);
+  shared_ptr<PosixThreadFactory> threadFactory = shared_ptr<PosixThreadFactory>(new PosixThreadFactory());
+  threadManager->threadFactory(threadFactory);
+  threadManager->start();
+
+  TThreadPoolServer server(processor, serverTransport, transportFactory, protocolFactory, threadManager);
   server.serve();
   return 0;
 }

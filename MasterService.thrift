@@ -13,10 +13,13 @@ struct MasterNode {
 }
 
 struct Block {
-	1: required i32 number;
-	2: required string miner;
-	3: required list<SharedService.Transaction> transactionsList;
-	4: required list<SharedService.Uncle> unclesList;
+	1: required string timestamp;
+	2: required i64 nonce;
+	3: required string prevHash;
+	4: required i32 number;
+	5: required string miner;
+	6: required list<SharedService.Transaction> transactionsList;
+	7: required list<SharedService.Uncle> unclesList;
 }
 
 
@@ -24,8 +27,9 @@ struct Block {
 // declare services used by workers and clients
 
 service MasterService extends SharedService.SharedService{
-	void processBlock (1:Block block);
+	void processBlocks();
 
+	void recvMiningStatus (1: i64 nonce, 2: i32 number);
 	// send data to all worker nodes
 	// void bcastDataItemsMap ();
 

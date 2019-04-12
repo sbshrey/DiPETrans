@@ -1,5 +1,5 @@
-CXX = g++ -std=c++11 -g -O3
-LFLAGS = -lthrift -lpthread
+CXX = g++ -std=c++11 -g -O3 -rdynamic
+LFLAGS = -lthrift -lpthread -lcrypto
 MSTARGET = masterServer
 WSTARGET = workerServer
 MCTARGET = masterClient

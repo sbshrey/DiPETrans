@@ -8,6 +8,7 @@ Apache Thrift (0.12.0)
 
 # Compile commands
 ./compileThrift.sh
+
 make
 
 

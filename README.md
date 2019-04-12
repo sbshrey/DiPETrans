@@ -16,19 +16,19 @@ make
 
 starting master server
 
-./masterServer 9090
+./masterServer 9090 data/block16/ethereum_data.json
 
 starting 5 worker servers
 
-./workerServer 9091
+./workerServer 9091 1
 
-./workerServer 9092
+./workerServer 9092 2
 
-./workerServer 9093
+./workerServer 9093 3
 
-./workerServer 9094
+./workerServer 9094 4
 
-./workerServer 9095
+./workerServer 9095 5
 
 # Master client calls master services
 

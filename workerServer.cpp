@@ -16,8 +16,7 @@
 
 #include "Logger.h"
 #include <iostream>
-
-
+#include <bits/stdc++.h>
 #include <openssl/sha.h>
 #include <sstream>
 #include <iomanip>
@@ -35,6 +34,7 @@ using namespace  ::WorkerService;
 using namespace  ::SharedService;
 
 std::map<string, int64_t> GlobalDataItemsMap;
+std::vector<string> contract_addresses;
 
 string WID = "1";
 string MSG="WorkerServer";
@@ -43,10 +43,10 @@ int masterPort = 9090;
 string masterIP = "localhost";
 
 
-string difficulty = "00011111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111";
+//string difficulty = "00011111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111";
 
 
-//string difficulty = "00111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111";
+string difficulty = "00111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111";
 
 
 string sha256(const string str) {
@@ -78,8 +78,8 @@ string convert_block_to_string(Block block) {
     str.append(tx.toAddress);
     str.append(tx.fromAddress);
     str.append(to_string(tx.value));
-    str.append(to_string(tx.gas));
-    str.append(to_string(tx.gasPrice));
+    str.append(tx.input);
+    str.append(tx.creates);
   }
 
   for (auto& u : block.unclesList) {
@@ -107,8 +107,8 @@ Block createBlock(Block b) {
       transaction.fromAddress = tx.fromAddress;
       transaction.toAddress = tx.toAddress;
       transaction.value = tx.value;
-      transaction.gas = tx.gas; // (double)tx["gas"];
-      transaction.gasPrice = tx.gasPrice; // (double)tx["gasPrice"]; 
+      transaction.input = tx.input; // (double)tx["gas"];
+      transaction.creates = tx.creates; // (double)tx["gasPrice"]; 
       block.transactionsList.push_back(transaction);
     }
 
@@ -119,6 +119,34 @@ Block createBlock(Block b) {
       block.unclesList.push_back(uncle);
     }
     return block;
+}
+
+
+
+bool execute (Transaction transaction) {
+  //int create_txs = 0;
+  //int execute_txs = 0;
+  bool status = false;
+  string cmd = "";
+
+  if (transaction.toAddress == "creates") {
+    cmd = "./contract_erc20 " + transaction.creates + " " + transaction.fromAddress + " " + transaction.toAddress;
+    //const char *command = cmd.c_str();
+    //cout << command << endl;
+  } else {
+    cmd = "./contract_erc20 " + transaction.toAddress + " " + transaction.fromAddress + " " + transaction.input;
+    //const char *command = cmd.c_str();
+    //cout << command << endl;
+    //status = system(command);
+    //cout << "execute transaction" << endl;
+    //execute_txs++;
+    //system()
+  }
+  const char *command = cmd.c_str();
+  cout << command << endl;
+  status = system(command);
+  return true;
+  //cout << create_txs << "\t" << execute_txs << endl;
 }
 
 
@@ -134,6 +162,13 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
   void recvTransactions( ::SharedService::WorkerResponse& _return, const std::vector< ::SharedService::Transaction> & TransactionsList, const std::map<std::string, double> & AccountsList) {
     // Your implementation goes here
     //_return.free();
+    ofstream nttfile;
+    nttfile.open("be_ntt_"+WID+".log",std::ofstream::out | std::ofstream::app);
+    ofstream cttfile;
+    cttfile.open("be_ctt_"+WID+".log",std::ofstream::out | std::ofstream::app);
+    double normal_txn_time = 0;
+    double contract_txn_time = 0;
+
     Logger::instance().log(MSG+" worker "+ WID +" recvTransactions starts", Logger::kLogLevelInfo);
     auto start = chrono::steady_clock::now();
     //printf("\n\nrecvTransactions\n");
@@ -153,8 +188,68 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
     Logger::instance().log(MSG+" TransactionsList starts", Logger::kLogLevelInfo);
     for (auto const& tx: TransactionsList) {
       //cout << tx.transactionID << "\t";
+      auto txn_start = chrono::steady_clock::now();
+      auto txn_end = chrono::steady_clock::now();
       double fee;
 
+
+      bool status= false;
+      if (tx.creates != "") {
+        //transaction.creates = tx["creates"];
+        contract_addresses.push_back(tx.creates);
+        status = execute(tx);
+        txn_end = chrono::steady_clock::now();
+        contract_txn_time += chrono::duration_cast<chrono::milliseconds>(txn_end - txn_start).count();
+        
+      } else {
+        //cout << "checking toAddress wiht contract_addresses created so far" << endl;
+        std::vector<string>::iterator it = std::find (contract_addresses.begin(), contract_addresses.end(), tx.toAddress); 
+        if (it != contract_addresses.end()) { 
+            //transaction.creates = "";
+            //std::cout << "Element " << ser <<" found at position : " ; 
+            //std:: cout << it - vec.begin() + 1 << "\n" ; 
+            status = execute(tx);
+            txn_end = chrono::steady_clock::now();
+            contract_txn_time += chrono::duration_cast<chrono::milliseconds>(txn_end - txn_start).count();
+        } 
+        else {
+            //std::cout << "Element not found.\n\n"; 
+            //cout << "financial transaction" << endl;
+          if (_return.accountList[tx.fromAddress] >= double(tx.value)) {
+            //fee = (double)tx["gasPrice"] * (double)tx["gas"];
+            _return.accountList[tx.fromAddress] = _return.accountList[tx.fromAddress] - double(tx.value) - fee;
+            //cout << "hello";
+            //if (tx.toAddress == "") {
+              //cout << "to" <<endl;
+              //_return.accountList[tx["to"]] = double(tx["value"]);
+            //} else {
+            _return.accountList[tx.toAddress] = _return.accountList[tx.toAddress] + double(tx.value);
+            //}
+            status = true;
+            txn_end = chrono::steady_clock::now();
+            normal_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
+            //successful_transactions++;
+          } else {
+            //failed_transactions++;
+            status = false;
+          }
+        }
+      }
+        
+
+      if (status) {
+        successful_transactions++;
+      } else {
+        failed_transactions++;
+      }
+      tx_fees += fee;
+      _return.transactionIDList.push_back(tx.transactionID);
+      total_transactions++;
+    }
+
+    cttfile << contract_txn_time << endl;
+    nttfile << normal_txn_time << endl; //contract_txn_time << endl;
+      /*
       if (_return.accountList[tx.fromAddress] >= double(tx.value))
       {
         fee = (double)(tx.gasPrice) * (double)(tx.gas);
@@ -175,6 +270,8 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
       _return.transactionIDList.push_back(tx.transactionID);
       total_transactions++;
     }
+    */
+
     _return.transactionFees = tx_fees;
     Logger::instance().log(MSG+" TransactionsList ends", Logger::kLogLevelInfo);
 
@@ -218,7 +315,7 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
       string block_str = convert_block_to_string(newBlock);
       hash = sha256(block_str);
       if (hash.compare(difficulty) < 0) {
-        cout << newBlock.nonce << endl;
+        //cout << newBlock.nonce << endl;
         break;
       }
 

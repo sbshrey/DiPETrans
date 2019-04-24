@@ -74,7 +74,7 @@ Block block;
 bool minerStatus = false;
 string filename;
 string block_hash = "0000000000000000000000000000000000000000000000000000000000000000";
-string difficulty = "00011111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111";
+string difficulty = "00111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111";
 
 
 
@@ -154,10 +154,27 @@ void createBlock(json::iterator data) {
     Transaction transaction;
     transaction.transactionID = txid++;
     transaction.fromAddress = tx["from"];
-    transaction.toAddress = tx["to"];
-    transaction.value = (double)tx["value"];
-    transaction.gas = (double)tx["gas"];
-    transaction.gasPrice = (double)tx["gasPrice"]; 
+    if (tx["to"].is_null()) {
+      transaction.toAddress = "creates";
+    } else {
+      transaction.toAddress = tx["to"];
+    }
+
+    if (tx["value"].is_number()) {
+      transaction.value = tx["value"].get<double>();
+    } else {
+      transaction.value = stod(tx["value"].get<string>());
+    }
+    //transaction.toAddress = tx["to"];
+    //transaction.value = (double)tx["value"];
+    transaction.input = tx["input"];
+    if (!tx["creates"].is_null()) {
+      transaction.creates = tx["creates"];
+      //contract_addresses.push_back(transaction.creates);
+    } else {
+      transaction.creates = "";
+    }
+    //transaction.creates = tx["creates"]; 
     block.transactionsList.push_back(transaction);
   }
   Logger::instance().log(MSG+" Block "+to_string(block.number)+" transactionsList ends", Logger::kLogLevelInfo);
@@ -211,8 +228,8 @@ string convert_block_to_string(Block block) {
     str.append(tx.toAddress);
     str.append(tx.fromAddress);
     str.append(std::to_string(tx.value));
-    str.append(std::to_string(tx.gas));
-    str.append(std::to_string(tx.gasPrice));
+    str.append(tx.input);
+    str.append(tx.creates);
   }
 
   for (auto& u : block.unclesList) {
@@ -248,12 +265,20 @@ void analyze(vector<Transaction> TransactionList) {
   Logger::instance().log(MSG+" AdjacencyMap starts", Logger::kLogLevelInfo);
   for (auto const& tx: TransactionList) {
     LocalConflictsMap[tx.fromAddress].push_back(tx.transactionID);
-    LocalConflictsMap[tx.toAddress].push_back(tx.transactionID);
-    AdjacencyMap[tx.fromAddress].push_back(tx.toAddress);
-    AdjacencyMap[tx.toAddress].push_back(tx.fromAddress);
+    if (tx.toAddress == "creates") {
+      LocalConflictsMap[tx.creates].push_back(tx.transactionID);
+      AdjacencyMap[tx.creates].push_back(tx.fromAddress); 
+      AddressList.insert(tx.creates);
+      AdjacencyMap[tx.fromAddress].push_back(tx.creates);
+    } else {
+      LocalConflictsMap[tx.toAddress].push_back(tx.transactionID);
+      AdjacencyMap[tx.toAddress].push_back(tx.fromAddress);
+      AddressList.insert(tx.toAddress);
+      AdjacencyMap[tx.fromAddress].push_back(tx.toAddress);
+    }
     
     AddressList.insert(tx.fromAddress);
-    AddressList.insert(tx.toAddress);
+    
   }
   Logger::instance().log(MSG+" AdjacencyMap ends", Logger::kLogLevelInfo);
 
@@ -369,6 +394,7 @@ class MasterServiceHandler : virtual public MasterServiceIf {
     
     int port = 9091;
     string ip = "localhost";
+    //string ip = "10.24.50.57";
 
     for (int id=1; id<=NUM_WORKERS; id++) {
       WorkerNode workerNode;
@@ -405,18 +431,20 @@ class MasterServiceHandler : virtual public MasterServiceIf {
 
   void processBlocks() {
     // open a file in write mode.
-    ofstream outfile;
-    outfile.open("masterServer.log",std::ios_base::app);
+    
     // Your implementation goes here
     for (json::iterator data = ethereum_data.begin(); data != ethereum_data.end(); ++data) {
+      cout << endl;
+      ofstream outfile;
+      outfile.open("masterServer.log",std::ofstream::out | std::ofstream::app);
     //for (auto& data: ethereum_data.items()) {
       // block creation starts
       auto start = chrono::steady_clock::now();
       createBlock(data);
-      if (block.number > 4370100) break;  
+      //if (block.number >= 4370100) break;  
       
       block.prevHash = block_hash;
-      outfile << block.number << "\t" << block.transactionsList.size() << "\t";
+      outfile << block.number << "\t" << block.transactionsList.size() << "\t" << block.unclesList.size() << "\t";
       auto end1 = chrono::steady_clock::now();
       outfile << chrono::duration_cast<chrono::microseconds>(end1 - start).count() << "\t";
       // miner status set to false for each block
@@ -494,6 +522,7 @@ class MasterServiceHandler : virtual public MasterServiceIf {
       auto end2 = chrono::steady_clock::now();
       outfile << chrono::duration_cast<chrono::microseconds>(end2 - end1).count() << "\t";
 
+      /*
       // Mining starts
 
       Logger::instance().log(MSG+" Block " + to_string(block.number) + " Block Mining starts", Logger::kLogLevelInfo);
@@ -529,7 +558,7 @@ class MasterServiceHandler : virtual public MasterServiceIf {
         cout << minerStatus;
         //bool status = minerStatus;
         //sleep(1);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
       }
       cout << endl;
 
@@ -541,16 +570,16 @@ class MasterServiceHandler : virtual public MasterServiceIf {
       auto end3 = chrono::steady_clock::now();
       outfile << chrono::duration_cast<chrono::microseconds>(end3 - end2).count() << "\t";
 
+      */
       Logger::instance().log(MSG+" Block "+to_string(block.number)+" clear_memory starts", Logger::kLogLevelInfo);
       clear_memory(); 
       Logger::instance().log(MSG+" Block "+to_string(block.number)+" clear_memory ends", Logger::kLogLevelInfo);
 
       auto end4 = chrono::steady_clock::now();
-      outfile << chrono::duration_cast<chrono::microseconds>(end4 - start).count() << "\t";
-      outfile << block.nonce << "\n";
-      
+      outfile << chrono::duration_cast<chrono::microseconds>(end4 - start).count() << "\n";
+      outfile.close();  
     }
-    //outfile.close();
+    
       
   }
 

@@ -7,7 +7,7 @@
 #include <functional> //for std::function
 #include <algorithm>  //for std::generate_n
 #include "Logger.h"
-
+#include <random>
 
 #include <openssl/sha.h>
 #include <sstream>
@@ -43,7 +43,7 @@ struct Transaction
 struct Block
 {
 	string timestamp;
-	int64_t nonce;
+	uint64_t nonce;
 	string prevHash;
 	//string hash;
 	int64_t number;
@@ -72,7 +72,8 @@ bool verifyECDSA(string pubkey, string hash,string r,string s,int8_t v) {
 // string = 34333131353030636165623163363738613765326135633832326335343235623964633533323864653364303365393864656663363732643932323237656132;
 
 string difficulty = "00011111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111";
-
+//string difficulty = "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000b01d242b7c6575ef7c593ec1204d6282000000";
+//string difficulty = "0000000000000000000000000000000000000000000000000000000000000000000000000000265B3B61FA6B9E08CF1F72BB03D926D291E05380000000000000"
 
 // string difficulty = "00111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111";
 
@@ -121,37 +122,27 @@ string convert_block_to_string(Block block) {
 
 string mine(Block block) {
 
-	block.nonce = 0;
-	
-	//cout << (char*)&block;
+	//std::random_device rd;     //Get a random seed from the OS entropy device, or whatever
+  	//std::mt19937_64 eng(rd()); //Use the 64-bit Mersenne Twister 19937 generator
+                             //and seed it with entropy.
 
-	
-	//cout << block_str << endl;
+  	//Define the distribution, by default it goes from 0 to MAX(unsigned long long)
+  	//or what have you.
+  	//std::uniform_int_distribution<unsigned long long> distr;
 
-	// serial search for nonce
-	//const string ibuf = "compute sha1";
-    //unsigned char obuf[20];
+	block.nonce = 0; //distr(eng);
 	string hash;
 	while (true) {
 		string block_str = convert_block_to_string(block);
-		hash = sha256(block_str);
+		hash = sha256(block_str); //sha256(sha256(block_str));
 		if (hash.compare(difficulty) < 0) {
-			cout << block.nonce << "\n";
+			//cout << block.nonce << "\t";
 			break;
 		}
 
 	    block.nonce++;
 	}
-    // hash = sha256(block_str); //, strlen(ibuf), obuf);
-
-    //int i;
-    //cout << block.nonce << "\n";
-    //printf("Ox");
-    //cout << hash << endl;
-    /*for (i = 0; i < hash.size(); i++) {
-        printf("%02x", hash[i]);
-    }*/
-    //printf("\n");
+	cout << block.nonce << "\t";
 	return hash;
 }
 
@@ -238,7 +229,7 @@ int main(int argc, char const *argv[])
 	    block.miner = data.value()["miner"];
 
 	    // running for originial ethrereum difficulty
-	    if (block.number > 4370100) break;
+	    if (block.number > 4370005) break;
 
 		//cout << block.miner << "\t";
 	    //block.gasLimit = data[i_str]["gasLimit"]

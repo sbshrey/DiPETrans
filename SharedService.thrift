@@ -6,8 +6,8 @@ struct Transaction {
 	2: required string fromAddress;
 	3: required string toAddress;
 	4: required double value;
-	5: required double gas;
-	6: required double gasPrice;
+	5: required string input;
+	6: required string creates;
 }
 
 struct Account {

@@ -24,4 +24,6 @@ make changes to run.py file
 
 change path for data folder in run.py file (currently running on simulated data for different ratios)
 
-and run python run.py
+run python run.py (for transaction execution only)
+
+run python run-mining.py (for transaction execution + PoW) 

@@ -9,29 +9,15 @@ Apache Thrift (0.12.0)
 # Compile commands
 ./compileThrift.sh
 make
-
+g++ -O3 -std=c++11 Logger.cpp serial-contract.cpp -o serial-contract -lcrypto
+g++ -O3 -std=c++11 Logger.cpp serial-mining.cpp -o serial-mining -lcrypto
+g++ -O3 -std=c++11 contract_erc20.cpp -o contract_erc20 -lcrypto
 
 
 # Run commands (each command on separate terminal)
 
-starting master server
+make changes to run.py file
 
-./masterServer 9090 data/block16/ethereum_data.json
+change path for data folder in run.py file (currently running on simulated data for different ratios)
 
-starting 5 worker servers
-
-./workerServer 9091
-
-./workerServer 9092
-
-./workerServer 9093
-
-./workerServer 9094
-
-./workerServer 9095
-
-# Master client calls master services
-
-starting Master client
-
-./masterClient 9090
+and run python run.py

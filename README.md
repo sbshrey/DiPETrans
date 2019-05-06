@@ -16,7 +16,7 @@ make
 
 starting master server
 
-./masterServer 9090
+./masterServer 9090 data/block16/ethereum_data.json
 
 starting 5 worker servers
 

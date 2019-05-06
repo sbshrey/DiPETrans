@@ -3,7 +3,6 @@ include "SharedService.thrift"
 
 //declare languages iface generation
 namespace cpp MasterService
-namespace py MasterService
 
 // declare data structures
 struct MasterNode {
@@ -13,13 +12,12 @@ struct MasterNode {
 }
 
 struct Block {
-	1: required string timestamp;
-	2: required i64 nonce;
-	3: required string prevHash;
-	4: required i32 number;
-	5: required string miner;
-	6: required list<SharedService.Transaction> transactionsList;
-	7: required list<SharedService.Uncle> unclesList;
+	1: required i32 number;
+	2: optional i64 nonce;
+	3: optional string prevHash;
+	4: optional string miner;
+	5: required list<SharedService.Transaction> transactionsList;
+	6: optional list<SharedService.Uncle> unclesList;
 }
 
 

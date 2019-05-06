@@ -2,7 +2,6 @@ include "SharedService.thrift"
 include "MasterService.thrift"
 
 namespace cpp WorkerService
-namespace py WorkerService
 
 struct result {
 	1: required i32 number;
@@ -15,5 +14,5 @@ service WorkerService extends SharedService.SharedService {
 
 	SharedService.WorkerResponse recvTransactions(1: list<SharedService.Transaction> TransactionsList, 2: map<string,double> AccountsList);
 
-	oneway void mineBlock(1: MasterService.Block block, 2: i16 nonce, 3: i16 interval);
+	 oneway void mineBlock(1: MasterService.Block block, 2: i16 nonce, 3: i16 interval);
 }

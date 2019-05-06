@@ -73,16 +73,13 @@ using namespace  ::SharedService;
 Block block;
 bool minerStatus = false;
 string filename;
+string dir_path;
 string block_hash = "0000000000000000000000000000000000000000000000000000000000000000";
 string difficulty = "00111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111";
 
 
 
 vector<WorkerNode> WorkerList;
-
-//vector<Transaction> TransactionList;
-//vector<Account> AccountList;
-
 
 
 
@@ -112,7 +109,7 @@ struct thread_data {
    int16_t workerID;
    string workerIP;
    int32_t workerPort;
-   string miner;
+   //string miner;
    int number;
 };
 
@@ -123,72 +120,26 @@ map<int16_t,vector<Transaction>> sendTransactionMap;
 map<int16_t, set<int16_t>> ccTransactionMap;
 
 
-void signal_handler(int sig) {
-  void *array[10];
-  size_t size;
-
-  // get void*'s for all entries on the stack
-  size = backtrace(array, 10);
-
-  // print out all the frames to stderr
-  fprintf(stderr, "Error: signal %d:\n", sig);
-  backtrace_symbols_fd(array, size, STDERR_FILENO);
-  exit(1);
-}
-
 
 void createBlock(json::iterator data) {
-  //for (auto& data: ethereum_data.items()) {
-  
-  //Block block;
   Logger::instance().log(MSG+" Block "+to_string(block.number)+" creation starts", Logger::kLogLevelInfo);
-  block.number = stoi(data.key());//atoi(d.key().c_str());
-  block.timestamp = data.value()["timestamp"];
-  block.nonce = 0;
-  block.prevHash = "0000000000000000000000000000000000000000000000000000000000000000";
-  block.miner = data.value()["miner"];
-
+  //block.number = index++;stoi(data.key());//atoi(d.key().c_str());
+  
   Logger::instance().log(MSG+" Block "+to_string(block.number)+" transactionsList starts", Logger::kLogLevelInfo);
   int16_t txid=0;
-  for (auto& tx: data.value()["transactions"]) {
+  for (auto& tx: (*data)["transactions"]) {
     Transaction transaction;
-    transaction.transactionID = txid++;
+    transaction.transactionID = txid++; //tx["txID"];
     transaction.fromAddress = tx["from"];
-    if (tx["to"].is_null()) {
-      transaction.toAddress = "creates";
-    } else {
-      transaction.toAddress = tx["to"];
-    }
-
-    if (tx["value"].is_number()) {
-      transaction.value = tx["value"].get<double>();
-    } else {
-      transaction.value = stod(tx["value"].get<string>());
-    }
-    //transaction.toAddress = tx["to"];
-    //transaction.value = (double)tx["value"];
+    transaction.toAddress = tx["to"];
+    transaction.value = tx["value"].get<double>();
     transaction.input = tx["input"];
-    if (!tx["creates"].is_null()) {
-      transaction.creates = tx["creates"];
-      //contract_addresses.push_back(transaction.creates);
-    } else {
-      transaction.creates = "";
-    }
-    //transaction.creates = tx["creates"]; 
+    transaction.creates = tx["creates"]; 
     block.transactionsList.push_back(transaction);
   }
   Logger::instance().log(MSG+" Block "+to_string(block.number)+" transactionsList ends", Logger::kLogLevelInfo);
-  
-  Logger::instance().log(MSG+" Block "+to_string(block.number)+" unclesList starts", Logger::kLogLevelInfo);
-  for (auto& u: data.value()["unclesList"]) {
-    Uncle uncle;
-    uncle.miner = u["miner"];
-    uncle.number = u["number"];
-    block.unclesList.push_back(uncle);
-  }
-  Logger::instance().log(MSG+" Block "+to_string(block.number)+" unclesList ends", Logger::kLogLevelInfo);
 
-  Logger::instance().log(MSG+" Block "+to_string(block.number)+" creation starts", Logger::kLogLevelInfo);
+  Logger::instance().log(MSG+" Block "+to_string(block.number)+" creation ends", Logger::kLogLevelInfo);
 }
 
 // Clears memory of global data structures after every block creation
@@ -200,50 +151,14 @@ void clear_memory() {
   GlobalWorkerResponsesList.clear();
   AdjacencyMap.clear();
   block.transactionsList.clear();
-  block.unclesList.clear();
 }
 
-string sha256(const string str) {
-    unsigned char hash[SHA256_DIGEST_LENGTH];
-    SHA256_CTX sha256;
-    SHA256_Init(&sha256);
-    SHA256_Update(&sha256, str.c_str(), str.size());
-    SHA256_Final(hash, &sha256);
-    stringstream ss;
-    for(int i = 0; i < SHA256_DIGEST_LENGTH; i++)
-        ss << hex << setw(2) << setfill('0') << (int)hash[i];
-    return ss.str();
-}
 
-string convert_block_to_string(Block block) {
-  string str = "";
-  str.append(block.timestamp);
-  str.append(to_string(block.nonce));
-  str.append(block.prevHash);
-  str.append(to_string(block.number));
-  str.append(block.miner);
-
-  for (auto& tx : block.transactionsList) {
-    str.append(to_string(tx.transactionID));
-    str.append(tx.toAddress);
-    str.append(tx.fromAddress);
-    str.append(std::to_string(tx.value));
-    str.append(tx.input);
-    str.append(tx.creates);
-  }
-
-  for (auto& u : block.unclesList) {
-    str.append(u.miner);
-    str.append(to_string(u.number));
-  }
-  return str;
-}
 
 // Recursive DFS to find all connected components
 void DFSUtil (int ccID, string v, map<string,bool> &visited) {
   // Mark the current node as visited and print it
   visited[v] = true;
-
   for (auto const& tx: LocalConflictsMap[v])
     ccTransactionMap[ccID].insert(tx);
   // Recur for all vertices
@@ -305,6 +220,7 @@ void analyze(vector<Transaction> TransactionList) {
       if (ccTransactionMap[ccID].size() > 0) {
         for (auto const& txid: ccTransactionMap[ccID]) {
           // load balancing across workers 
+          
           sendTransactionMap[WorkerList[id].workerID].push_back(TransactionList[txid]);
         }
 
@@ -328,7 +244,6 @@ void analyze(vector<Transaction> TransactionList) {
     }
   }
 }
-
 
 // multi threaded function call to spin parallel connection to each worker from master
 
@@ -366,7 +281,7 @@ void *connectWorker (void *threadarg) {
   
   workerClient.recvTransactions(LocalWorkerResponse,sendTransactionMap[worker->workerID],LocalDataItemsMap); // returns local worker response
 
-  cout << worker->threadID << ":" << sendTransactionMap[worker->workerID].size() << "\t";
+  cout << worker->threadID << ":" << sendTransactionMap[worker->workerID].size() << "\n";
   Logger::instance().log(MSG+" Block "+to_string(worker->number) +" WorkerID "+to_string(worker->workerID)+" recvTransactions() ends", Logger::kLogLevelInfo);
   
   map<string,double>::iterator it;
@@ -374,8 +289,6 @@ void *connectWorker (void *threadarg) {
   {
     DataItemsMap[it->first] = it->second;
   }
-
-  DataItemsMap[worker->miner] += LocalWorkerResponse.transactionFees; 
 
   transport->close();
   Logger::instance().log(MSG+" Block "+to_string(worker->number) +" connection to worker "+to_string(worker->workerID)+" ends", Logger::kLogLevelInfo);
@@ -392,7 +305,7 @@ class MasterServiceHandler : virtual public MasterServiceIf {
   MasterServiceHandler() {
     // Your initialization goes here
     
-    int port = 9091;
+    int port = 8091;
     string ip = "localhost";
     //string ip = "10.24.50.57";
 
@@ -418,9 +331,7 @@ class MasterServiceHandler : virtual public MasterServiceIf {
     }
     Logger::instance().log(MSG+" Initializing accounts with 100000000000000000000000 wei to execute transactions ends", Logger::kLogLevelInfo);
     
-    //string filename = argv[3];
-    std::ifstream ethereum_data_file(filename);//, std::ifstream::binary);
-    //int total_transactions = 0;
+    std::ifstream ethereum_data_file(filename);
     ethereum_data_file >> ethereum_data;    
 
     
@@ -433,20 +344,18 @@ class MasterServiceHandler : virtual public MasterServiceIf {
     // open a file in write mode.
     
     // Your implementation goes here
+    int64_t index = 0;
     for (json::iterator data = ethereum_data.begin(); data != ethereum_data.end(); ++data) {
-      cout << endl;
-      ofstream outfile;
-      outfile.open("masterServer.log",std::ofstream::out | std::ofstream::app);
-    //for (auto& data: ethereum_data.items()) {
-      // block creation starts
+
       auto start = chrono::steady_clock::now();
+      block.number = index++;
       createBlock(data);
-      //if (block.number >= 4370100) break;  
       
-      block.prevHash = block_hash;
-      outfile << block.number << "\t" << block.transactionsList.size() << "\t" << block.unclesList.size() << "\t";
-      auto end1 = chrono::steady_clock::now();
-      outfile << chrono::duration_cast<chrono::microseconds>(end1 - start).count() << "\t";
+      cout << block.number << "\t" << block.transactionsList.size() << "\n";
+
+      ofstream e2efile;
+      e2efile.open(dir_path+"be_e2e.csv",std::ofstream::out | std::ofstream::app);
+      
       // miner status set to false for each block
       // it is to stop mining once solution is found
       minerStatus = false;
@@ -476,7 +385,6 @@ class MasterServiceHandler : virtual public MasterServiceIf {
           td[thID].workerID = worker.workerID;
           td[thID].workerIP = worker.workerIP;
           td[thID].workerPort = worker.workerPort;
-          td[thID].miner = block.miner;
           td[thID].number = block.number;
 
           Logger::instance().log(MSG+" Block "+to_string(block.number)+" thread " + to_string(thID) +" starts", Logger::kLogLevelInfo); 
@@ -497,92 +405,20 @@ class MasterServiceHandler : virtual public MasterServiceIf {
              exit(-1);
           }
           Logger::instance().log(MSG+" Block "+to_string(block.number)+" thread " + to_string(td[thID].threadID) +" ends", Logger::kLogLevelInfo);
-        }
-                                                                                                                                                                                         
+        }                                                                                                                                                                           
       }
-
-      Logger::instance().log("Block " + to_string(block.number) + " Uncles Execution starts", Logger::kLogLevelInfo);
-        
-      //cout << data[i_str]
-      //cout << "UnclesList"
-      for (auto& uncle: block.unclesList) {
-        int ubn = uncle.number;
-        //cout << ubn << endl;
-        DataItemsMap[uncle.miner] = DataItemsMap[uncle.miner] + ((ubn+8-block.number) * base_reward)/8;
-        uncle_reward += (base_reward/32);
-        //cout << block.number << "\t" << base_reward << endl;
-        //cout << "uncle: " << ubn << " reward:" << uncle_reward << "," << (block.number-ubn) << " ," << ((ubn+8-block.number) * base_reward)/8 << endl;
-      }
-      Logger::instance().log("Block " + to_string(block.number) + " Uncles Execution ends", Logger::kLogLevelInfo);
-
-      //cout << "Adding block reward" << endl;
-
-      DataItemsMap[block.miner] = DataItemsMap[block.miner] + (base_reward + uncle_reward);
-
-      auto end2 = chrono::steady_clock::now();
-      outfile << chrono::duration_cast<chrono::microseconds>(end2 - end1).count() << "\t";
-
-      /*
-      // Mining starts
-
-      Logger::instance().log(MSG+" Block " + to_string(block.number) + " Block Mining starts", Logger::kLogLevelInfo);
-
-      minerStatus = false;
-      for (auto const& worker : WorkerList) {
-        std::shared_ptr<TTransport> socket(new TSocket(worker.workerIP, worker.workerPort));
-        std::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
-        std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
-        WorkerServiceClient workerClient(protocol);
-
-        Logger::instance().log(MSG+" Block "+to_string(block.number) +" connection to worker "+to_string(worker.workerID)+" starts", Logger::kLogLevelInfo);
-        transport->open();
-
-        Logger::instance().log(MSG+" Block "+to_string(block.number) +" WorkerID "+to_string(worker.workerID)+" mineBlock() starts", Logger::kLogLevelInfo);
-        //printf("Sending transactionsList and LocalDataItemsMap to worker nodes\n");
-
-
-        workerClient.mineBlock(block,block.nonce,NUM_WORKERS); // returns local worker response
-
-        Logger::instance().log(MSG+" Block "+to_string(block.number) +" WorkerID "+to_string(worker.workerID)+" mineBlock() ends", Logger::kLogLevelInfo);
-        
-        transport->close();
-        Logger::instance().log(MSG+" Block "+to_string(block.number) +" connection to worker "+to_string(worker.workerID)+" ends", Logger::kLogLevelInfo);
-        //Logger::instance().log(MSG+" Block "+to_string(newBlock.number) +" thread "+ to_string(worker.workerID) +" ends", Logger::kLogLevelInfo);
-
-      }
-
-      //cout << "waiting starts" <<  endl;
-
-      cout << endl;
-      while (!minerStatus) {
-        cout << minerStatus;
-        //bool status = minerStatus;
-        //sleep(1);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-      }
-      cout << endl;
-
-      //cout << endl << "waiting ends" << endl;
-
       
-      Logger::instance().log(MSG+" Block " + to_string(block.number) + " Block Mining ends", Logger::kLogLevelInfo);
-
-      auto end3 = chrono::steady_clock::now();
-      outfile << chrono::duration_cast<chrono::microseconds>(end3 - end2).count() << "\t";
-
-      */
       Logger::instance().log(MSG+" Block "+to_string(block.number)+" clear_memory starts", Logger::kLogLevelInfo);
       clear_memory(); 
       Logger::instance().log(MSG+" Block "+to_string(block.number)+" clear_memory ends", Logger::kLogLevelInfo);
 
       auto end4 = chrono::steady_clock::now();
-      outfile << chrono::duration_cast<chrono::microseconds>(end4 - start).count() << "\n";
-      outfile.close();  
+      e2efile << chrono::duration_cast<chrono::microseconds>(end4 - start).count() << "\n";
+      e2efile.close();  
     }
     
       
   }
-
 
   void recvMiningStatus(const int64_t nonce, const int32_t number) {
     // Your implementation goes here
@@ -593,8 +429,8 @@ class MasterServiceHandler : virtual public MasterServiceIf {
     if (block.number == number && !minerStatus) {
       block.nonce = nonce;
       
-      string block_str = convert_block_to_string(block);
-      block_hash = sha256(block_str);
+      //string block_str = convert_block_to_string(block);
+      //block_hash = sha256(block_str);
       //cout << nonce << "\t" << block_hash << endl;
 
       minerStatus = true;
@@ -605,17 +441,15 @@ class MasterServiceHandler : virtual public MasterServiceIf {
     //printf("recvMiningStatus\n");
   }
 
-
 };
 
 int main(int argc, char **argv) {
-  //srand(RANDOM_SEED);
-  signal(SIGSEGV, signal_handler);
   Logger::instance().log(MSG+" starts", Logger::kLogLevelInfo);
   
   int port = atoi(argv[1]);
   NUM_THREADS = atoi(argv[2]);
   filename = argv[3];
+  dir_path = argv[4];
   NUM_WORKERS = NUM_THREADS;
 
   ::apache::thrift::stdcxx::shared_ptr<MasterServiceHandler> handler(new MasterServiceHandler());
@@ -623,15 +457,6 @@ int main(int argc, char **argv) {
   ::apache::thrift::stdcxx::shared_ptr<TServerTransport> serverTransport(new TServerSocket(port));
   ::apache::thrift::stdcxx::shared_ptr<TTransportFactory> transportFactory(new TBufferedTransportFactory());
   ::apache::thrift::stdcxx::shared_ptr<TProtocolFactory> protocolFactory(new TBinaryProtocolFactory());
-  
-
-  //shared_ptr<UserStorageHandler> handler(new UserStorageHandler());
-  //shared_ptr<MasterServiceHandler> handler(new MasterServiceHandler());
-  //shared_ptr<TProcessor> processor(new MasterServiceProcessor(handler));
-  //::apache::thrift::stdcxx::shared_ptr<TServerTransport> serverTransport(new TServerSocket(port));
-  //shared_ptr<TTransportFactory> transportFactory(new TBufferedTransportFactory());
-  //shared_ptr<TNonblockingServerSocket> nbServerTransport(new TNonblockingServerSocket(port));
-  //shared_ptr<TProtocolFactory> protocolFactory(new TBinaryProtocolFactory());
   
   // using thread pool with maximum 15 threads to handle incoming requests
   shared_ptr<ThreadManager> threadManager = ThreadManager::newSimpleThreadManager(5);

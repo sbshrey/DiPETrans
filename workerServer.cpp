@@ -37,16 +37,33 @@ std::map<string, int64_t> GlobalDataItemsMap;
 std::vector<string> contract_addresses;
 
 string WID = "1";
+string dir_path;
 string MSG="WorkerServer";
 
-int masterPort = 9090;
+int masterPort = 8090;
 string masterIP = "localhost";
 
+Block createBlock(Block b) {
+    Block block;
+    block.number = b.number; //stoi(data.key());//atoi(d.key().c_str());
+    
+    for (auto& tx: b.transactionsList) {
+      Transaction transaction;
+      transaction.transactionID = tx.transactionID;
+      transaction.fromAddress = tx.fromAddress;
+      transaction.toAddress = tx.toAddress;
+      transaction.value = tx.value;
+      transaction.input = tx.input; // (double)tx["gas"];
+      transaction.creates = tx.creates; // (double)tx["gasPrice"]; 
+      block.transactionsList.push_back(transaction);
+    }
 
-//string difficulty = "00011111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111";
+    return block;
+}
 
 
-string difficulty = "00111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111";
+
+string difficulty = "00011111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111";
 
 
 string sha256(const string str) {
@@ -67,7 +84,7 @@ string sha256(const string str) {
 
 string convert_block_to_string(Block block) {
   string str = "";
-  str.append(block.timestamp);
+  //str.append(block.timestamp);
   str.append(to_string(block.nonce));
   str.append(block.prevHash);
   str.append(to_string(block.number));
@@ -88,93 +105,48 @@ string convert_block_to_string(Block block) {
   }
 
   return str;
-  //str.append(block.transaction_count);
 }
-
-
-Block createBlock(Block b) {
-    Block block;
-    block.number = b.number; //stoi(data.key());//atoi(d.key().c_str());
-    block.timestamp = b.timestamp; // data.value["timestamp"];
-    block.nonce = b.nonce;
-    block.prevHash = b.prevHash; //"0000000000000000000000000000000000000000000000000000000000000000";
-    block.miner = b.miner; // data.value()["miner"];
-    //block.transactionsList.clear();
-    //block.unclesList.clear();
-    for (auto& tx: b.transactionsList) {
-      Transaction transaction;
-      transaction.transactionID = tx.transactionID;
-      transaction.fromAddress = tx.fromAddress;
-      transaction.toAddress = tx.toAddress;
-      transaction.value = tx.value;
-      transaction.input = tx.input; // (double)tx["gas"];
-      transaction.creates = tx.creates; // (double)tx["gasPrice"]; 
-      block.transactionsList.push_back(transaction);
-    }
-
-    for (auto& u: b.unclesList) {
-      Uncle uncle;
-      uncle.miner = u.miner;
-      uncle.number = u.number;
-      block.unclesList.push_back(uncle);
-    }
-    return block;
-}
-
-
 
 bool execute (Transaction transaction) {
-  //int create_txs = 0;
-  //int execute_txs = 0;
   bool status = false;
   string cmd = "";
 
   if (transaction.toAddress == "creates") {
     cmd = "./contract_erc20 " + transaction.creates + " " + transaction.fromAddress + " " + transaction.toAddress;
-    //const char *command = cmd.c_str();
-    //cout << command << endl;
   } else {
     cmd = "./contract_erc20 " + transaction.toAddress + " " + transaction.fromAddress + " " + transaction.input;
-    //const char *command = cmd.c_str();
-    //cout << command << endl;
-    //status = system(command);
-    //cout << "execute transaction" << endl;
-    //execute_txs++;
-    //system()
   }
   const char *command = cmd.c_str();
-  cout << command << endl;
   status = system(command);
   return true;
-  //cout << create_txs << "\t" << execute_txs << endl;
 }
 
 
 class WorkerServiceHandler : virtual public WorkerServiceIf {
  public:
   WorkerServiceHandler() {
-    // Your initialization goes here
-    int index = 1;  
-    
+    // Your initialization goes here    
       
   }
 
   void recvTransactions( ::SharedService::WorkerResponse& _return, const std::vector< ::SharedService::Transaction> & TransactionsList, const std::map<std::string, double> & AccountsList) {
     // Your implementation goes here
-    //_return.free();
     ofstream nttfile;
-    nttfile.open("be_ntt_"+WID+".log",std::ofstream::out | std::ofstream::app);
+    nttfile.open(dir_path + "be_ntt_"+WID+".log",std::ofstream::out | std::ofstream::app);
     ofstream cttfile;
-    cttfile.open("be_ctt_"+WID+".log",std::ofstream::out | std::ofstream::app);
+    cttfile.open(dir_path + "be_ctt_"+WID+".log",std::ofstream::out | std::ofstream::app);
     double normal_txn_time = 0;
     double contract_txn_time = 0;
 
     Logger::instance().log(MSG+" worker "+ WID +" recvTransactions starts", Logger::kLogLevelInfo);
     auto start = chrono::steady_clock::now();
-    //printf("\n\nrecvTransactions\n");
     int successful_transactions = 0;
     int failed_transactions = 0;
     int total_transactions = 0;
+
+
+    int sc_cnt = 0;
+    int nsc_cnt = 0;
 
     double tx_fees = 0;
 
@@ -186,8 +158,9 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
     Logger::instance().log(MSG+" AccountsList ends", Logger::kLogLevelInfo);
 
     Logger::instance().log(MSG+" TransactionsList starts", Logger::kLogLevelInfo);
+    //cout << endl;
     for (auto const& tx: TransactionsList) {
-      //cout << tx.transactionID << "\t";
+      //cout << "tx" << tx.transactionID << "\t";
       auto txn_start = chrono::steady_clock::now();
       auto txn_end = chrono::steady_clock::now();
       double fee;
@@ -195,48 +168,34 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
 
       bool status= false;
       if (tx.creates != "") {
-        //transaction.creates = tx["creates"];
         contract_addresses.push_back(tx.creates);
         status = execute(tx);
         txn_end = chrono::steady_clock::now();
-        contract_txn_time += chrono::duration_cast<chrono::milliseconds>(txn_end - txn_start).count();
-        
+        contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
+        sc_cnt++;
       } else {
-        //cout << "checking toAddress wiht contract_addresses created so far" << endl;
         std::vector<string>::iterator it = std::find (contract_addresses.begin(), contract_addresses.end(), tx.toAddress); 
-        if (it != contract_addresses.end()) { 
-            //transaction.creates = "";
-            //std::cout << "Element " << ser <<" found at position : " ; 
-            //std:: cout << it - vec.begin() + 1 << "\n" ; 
+        if (it != contract_addresses.end()) {  
             status = execute(tx);
             txn_end = chrono::steady_clock::now();
-            contract_txn_time += chrono::duration_cast<chrono::milliseconds>(txn_end - txn_start).count();
+            contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
+            sc_cnt++;
         } 
         else {
-            //std::cout << "Element not found.\n\n"; 
-            //cout << "financial transaction" << endl;
           if (_return.accountList[tx.fromAddress] >= double(tx.value)) {
-            //fee = (double)tx["gasPrice"] * (double)tx["gas"];
             _return.accountList[tx.fromAddress] = _return.accountList[tx.fromAddress] - double(tx.value) - fee;
-            //cout << "hello";
-            //if (tx.toAddress == "") {
-              //cout << "to" <<endl;
-              //_return.accountList[tx["to"]] = double(tx["value"]);
-            //} else {
             _return.accountList[tx.toAddress] = _return.accountList[tx.toAddress] + double(tx.value);
-            //}
-            status = true;
-            txn_end = chrono::steady_clock::now();
-            normal_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
-            //successful_transactions++;
+            status = true;  
           } else {
-            //failed_transactions++;
             status = false;
           }
+          txn_end = chrono::steady_clock::now();
+          normal_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
+          nsc_cnt++;
         }
       }
         
-
+      //cout << endl;
       if (status) {
         successful_transactions++;
       } else {
@@ -247,62 +206,17 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
       total_transactions++;
     }
 
+    cout << "WID " << WID << "\tsc " << sc_cnt << "\tnsc " << nsc_cnt << endl;
+
     cttfile << contract_txn_time << endl;
-    nttfile << normal_txn_time << endl; //contract_txn_time << endl;
-      /*
-      if (_return.accountList[tx.fromAddress] >= double(tx.value))
-      {
-        fee = (double)(tx.gasPrice) * (double)(tx.gas);
-        _return.accountList[tx.fromAddress] -= (double)(tx.value) - fee;
-        _return.accountList[tx.toAddress] += (double)(tx.value);
-        
-        //cout << "successful_transactions" << endl;
-        //cout << "from_address: " << tx["from_address"] << DataItemsMap[tx["from_address"]] << endl; 
-        //cout << "to_address: " << tx["to_address"] << DataItemsMap[tx["to_address"]] << endl; 
-        successful_transactions++;
-      } else {
-        //cout << "Block:"+i_str << endl;
-        //cout << "Transaction: " <<DataItemsMap[tx["from"]] << "\t" << ((double)tx["value"]) << endl;
-        //cout << "Transaction Failed!!! Insufficient Balance" << endl;
-        failed_transactions++;
-      }
-      tx_fees += fee;
-      _return.transactionIDList.push_back(tx.transactionID);
-      total_transactions++;
-    }
-    */
+    nttfile << normal_txn_time << endl;
 
     _return.transactionFees = tx_fees;
     Logger::instance().log(MSG+" TransactionsList ends", Logger::kLogLevelInfo);
 
-    // TODO: Add block number in logs
-
-    //cout << tx_fees << endl;
-  
-    /*
-    map<string,double>::iterator it;
-    for (it = _return.accountList.begin(); it != _return.accountList.end(); ++it)
-    {
-      cout << it->first << "\t" << it->second << endl;
-    }
-    cout << endl;
-    for (auto const & i:_return.transactionIDList)
-    {
-      cout << i << "\t";
-    }
-    cout << endl;
-    */
-    //cout << "\nTransactions Fees: " << _return.transactionFees << endl;
-    
-    //cout << endl;
     Logger::instance().log(MSG+" worker "+ WID +" recvTransactions ends", Logger::kLogLevelInfo);
     auto end = chrono::steady_clock::now();
-    cout << chrono::duration_cast<chrono::microseconds>(end - start).count() << "\t";
-    cout << total_transactions << "\t";
-    cout << successful_transactions << "\t";
-    cout << failed_transactions << "\t";
   }
-
 
   void mineBlock(const  ::MasterService::Block& block, const int16_t nonce, const int16_t interval) {
     // Your implementation goes here
@@ -357,6 +271,7 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
 int main(int argc, char **argv) {
   int port = atoi(argv[1]);
   WID = argv[2];
+  dir_path = argv[3];
 
   ::apache::thrift::stdcxx::shared_ptr<WorkerServiceHandler> handler(new WorkerServiceHandler());
   ::apache::thrift::stdcxx::shared_ptr<TProcessor> processor(new WorkerServiceProcessor(handler));

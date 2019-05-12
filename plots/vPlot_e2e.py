@@ -144,7 +144,7 @@ for i in range(1,len(medians) + 1):
 
 #Writing Mean values
 for i in range(1,len(mean) + 1):
-    text(i,mean[i-1]+250,'%.2f' % mean[i-1],horizontalalignment='right',color='purple',size=12)
+    text(i,mean[i-1],'%.2f' % mean[i-1],horizontalalignment='right',color='purple',size=12)
 #    print "mean[i-1]={0} .1f' % mean[i-1]={1}".format(mean[i-1],'%.1f' % mean[i-1])
 #    f_mean.write("{0}\n".format('%.1f' % mean[i-1]))
 

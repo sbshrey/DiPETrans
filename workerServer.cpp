@@ -21,6 +21,8 @@
 #include <sstream>
 #include <iomanip>
 
+#include "contract.h"
+#include "utils.h"
 
 using namespace std;
 using namespace ::apache::thrift;
@@ -35,6 +37,8 @@ using namespace  ::SharedService;
 
 std::map<string, int64_t> GlobalDataItemsMap;
 std::vector<string> contract_addresses;
+std::vector<string> addresses;
+    
 
 string WID = "1";
 string dir_path;
@@ -66,22 +70,6 @@ Block createBlock(Block b) {
 string difficulty = "00011111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111";
 
 
-string sha256(const string str) {
-    unsigned char hash[SHA256_DIGEST_LENGTH];
-    SHA256_CTX sha256;
-    SHA256_Init(&sha256);
-    SHA256_Update(&sha256, str.c_str(), str.size());
-    SHA256_Final(hash, &sha256);
-    //cout << "hash" << hash << endl;
-    stringstream ss;
-    for(int i = 0; i < SHA256_DIGEST_LENGTH; i++)
-    {
-        ss << hex << setw(2) << setfill('0') << (int)hash[i];
-    }
-    return ss.str();
-}
-
-
 string convert_block_to_string(Block block) {
   string str = "";
   //str.append(block.timestamp);
@@ -107,34 +95,57 @@ string convert_block_to_string(Block block) {
   return str;
 }
 
-bool execute (Transaction transaction) {
-  bool status = false;
+/*
+bool execute (Transaction transaction, int status) {
+  bool stat = false;
   string cmd = "";
 
-  if (transaction.toAddress == "creates") {
+
+  // status == 0 contract creation
+  // status == 1 toAddress is the contract address
+  // status == 2 fromAddress is the contract address
+  if (status == 0) {
     cmd = "./contract_erc20 " + transaction.creates + " " + transaction.fromAddress + " " + transaction.toAddress;
-  } else {
+  } else if (status == 1) {
     cmd = "./contract_erc20 " + transaction.toAddress + " " + transaction.fromAddress + " " + transaction.input;
+  } else {
+    cmd = "./contract_erc20 " + transaction.fromAddress + " " + transaction.toAddress + " " + transaction.input;
   }
   const char *command = cmd.c_str();
-  status = system(command);
+  stat = system(command);
   return true;
 }
+*/
+
+
+
+
+
+
+
 
 
 class WorkerServiceHandler : virtual public WorkerServiceIf {
  public:
   WorkerServiceHandler() {
     // Your initialization goes here    
-      
+    ifstream file("data/bigquery/addresses.txt");
+    std::string str; 
+    while (std::getline(file, str))
+    {
+      addresses.push_back(str);
+      //cout << str << endl;
+    }
   }
 
-  void recvTransactions( ::SharedService::WorkerResponse& _return, const std::vector< ::SharedService::Transaction> & TransactionsList, const std::map<std::string, double> & AccountsList) {
+  void recvTransactions( ::SharedService::WorkerResponse& _return, const std::vector< ::SharedService::Transaction> & TransactionsList, const std::map<std::string,  ::SharedService::DataItem> & dataItemMap) {
     // Your implementation goes here
     ofstream nttfile;
     nttfile.open(dir_path + "be_ntt_"+WID+".log",std::ofstream::out | std::ofstream::app);
     ofstream cttfile;
     cttfile.open(dir_path + "be_ctt_"+WID+".log",std::ofstream::out | std::ofstream::app);
+    ofstream scfile;
+    scfile.open(dir_path+"sc_call.csv",std::ofstream::out | std::ofstream::app);
     double normal_txn_time = 0;
     double contract_txn_time = 0;
 
@@ -150,12 +161,12 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
 
     double tx_fees = 0;
 
-    Logger::instance().log(MSG+" AccountsList starts", Logger::kLogLevelInfo);
-    for (auto const& account: AccountsList)
+    Logger::instance().log(MSG+" dataItemMap starts", Logger::kLogLevelInfo);
+    for (auto const& address: dataItemMap)
     {
-      _return.accountList[account.first] = account.second;
+      _return.dataItemMap[address.first].value = address.second.value;
     }
-    Logger::instance().log(MSG+" AccountsList ends", Logger::kLogLevelInfo);
+    Logger::instance().log(MSG+" dataItemMap ends", Logger::kLogLevelInfo);
 
     Logger::instance().log(MSG+" TransactionsList starts", Logger::kLogLevelInfo);
     //cout << endl;
@@ -165,26 +176,67 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
       auto txn_end = chrono::steady_clock::now();
       double fee;
 
-
+      
       bool status= false;
       if (tx.creates != "") {
+        //cout << "creates contract: " << tx.creates << endl;
         contract_addresses.push_back(tx.creates);
-        status = execute(tx);
+        DataItem localDataItem;
+        call_contract(localDataItem, tx.creates, tx.fromAddress, tx.toAddress, tx.value);
+        //cout << "contract created" << endl;
+        _return.dataItemMap[tx.creates] =  localDataItem;
+        //cout << "contract state saved" << endl;
+        // status = execute(tx, 0);
+        // call_contract(tx.creates, )
+        //ERC20 *tc = new ERC20(addresses);
+        //tc->distributeERC20(addresses);
+
+
         txn_end = chrono::steady_clock::now();
         contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
         sc_cnt++;
       } else {
+        bool flag = false;
         std::vector<string>::iterator it = std::find (contract_addresses.begin(), contract_addresses.end(), tx.toAddress); 
         if (it != contract_addresses.end()) {  
-            status = execute(tx);
-            txn_end = chrono::steady_clock::now();
-            contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
-            sc_cnt++;
-        } 
-        else {
-          if (_return.accountList[tx.fromAddress] >= double(tx.value)) {
-            _return.accountList[tx.fromAddress] = _return.accountList[tx.fromAddress] - double(tx.value) - fee;
-            _return.accountList[tx.toAddress] = _return.accountList[tx.toAddress] + double(tx.value);
+          //if (tx.input.size() > 2) {
+            //cout << "worker_" + WID + " : " << tx.input.substr(0,10) << endl;
+          //  scfile << tx.input.substr(0,10) << endl;
+          //}
+          //status = execute(tx, 1);
+          
+          //cout << "calling toAddress " << tx.toAddress << endl;
+          //cout << "input " << tx.input << endl;
+          DataItem localDataItem = _return.dataItemMap[tx.toAddress];
+          call_contract(localDataItem, tx.toAddress, tx.fromAddress, tx.input, tx.value);
+          _return.dataItemMap[tx.toAddress] =  localDataItem;
+          txn_end = chrono::steady_clock::now();
+          contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
+          sc_cnt++;
+          flag = true;
+        }
+
+        it = std::find (contract_addresses.begin(), contract_addresses.end(), tx.fromAddress); 
+        if (it != contract_addresses.end() and !flag) {  
+          if (tx.input.size() > 2) {
+            //cout << "worker_" + WID + " : " << tx.input.substr(0,10) << endl;
+            scfile << tx.input.substr(0,10) << endl;
+          }
+          //status = execute(tx, 2);
+          //cout << "calling fromAddress " << tx.fromAddress << endl; 
+          DataItem localDataItem = _return.dataItemMap[tx.fromAddress];
+          call_contract(localDataItem, tx.fromAddress, tx.toAddress, tx.input, tx.value);
+          _return.dataItemMap[tx.fromAddress] = localDataItem;
+          txn_end = chrono::steady_clock::now();
+          contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
+          sc_cnt++;
+          flag = true;
+        }
+
+        if (!flag) {
+          if (_return.dataItemMap[tx.fromAddress].value >= double(tx.value)) {
+            _return.dataItemMap[tx.fromAddress].value -=  (double(tx.value) - fee);
+            _return.dataItemMap[tx.toAddress].value += double(tx.value);
             status = true;  
           } else {
             status = false;
@@ -272,6 +324,8 @@ int main(int argc, char **argv) {
   int port = atoi(argv[1]);
   WID = argv[2];
   dir_path = argv[3];
+
+
 
   ::apache::thrift::stdcxx::shared_ptr<WorkerServiceHandler> handler(new WorkerServiceHandler());
   ::apache::thrift::stdcxx::shared_ptr<TProcessor> processor(new WorkerServiceProcessor(handler));

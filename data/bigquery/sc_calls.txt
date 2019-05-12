@@ -452,3 +452,21 @@ Sorted Smart contract function calls
 0x278b8c0e :: 482422, cancelOrder(address,uint256,address,uint256,uint256,uint256,uint8,bytes32,bytes32)	
 0x0a19b14a :: 625493, trade(address,uint256,address,uint256,uint256,uint256,address,uint8,bytes32,bytes32,uint256)	
 0xa9059cbb :: 3159833,transfer(address,uint256)
+
+
+
+
+***********
+
+'0xa9059cbb', 56653
+'0x095ea7b3', 11798
+'0x0121b93f', 11508
+'0xc6427474', 8162
+'0x867904b4', 5722
+'0x38bbfa50', 5005
+'0xdc6dd152', 4996
+'0xad8733ca', 4821
+'0xa8faf6f0', 4466
+'0x87ccccb3', 4156
+'0x0d571742', 3118
+'0xa68a76cc', 2636

@@ -1,4 +1,4 @@
-#rm -rf data/bigquery/ethereum_data_1_1/1_worker/be_ctt.csv data/1_worker/be_ntt.csv
+#rm -rf logs/simulated/ethereum_data_1_1/1_worker/be_ctt.csv data/1_worker/be_ntt.csv
 #rm -rf data/2_workers/be_ntt.csv data/2_workers/be_ctt.csv
 #rm -rf data/3_workers/be_ntt.csv data/3_workers/be_ctt.csv
 #rm -rf data/4_workers/be_ntt.csv data/4_workers/be_ctt.csv
@@ -53,51 +53,51 @@
 #python plots/vPlot_ctt.py data/be_ctt.csv plots/be_ctt.pdf "serial,1_worker,2_workers,3_workers,4_workers,5_workers" "Contract Transaction Execution Time (milliseconds)" "Configurations"
 
 
-#paste -d ',' data/bigquery/ethereum_data_1_1/serial/be_ntt.csv data/bigquery/ethereum_data_1_1/1_worker/be_ntt.csv data/bigquery/ethereum_data_1_1/2_workers/be_ntt.csv data/bigquery/ethereum_data_1_1/3_workers/be_ntt.csv data/bigquery/ethereum_data_1_1/4_workers/be_ntt.csv data/bigquery/ethereum_data_1_1/5_workers/be_ntt.csv > data/bigquery/ethereum_data_1_1/be_ntt.csv
-#python plots/vPlot_ntt.py data/bigquery/ethereum_data_1_1/be_ntt.csv plots/bigquery/ethereum_data_1_1/be_ntt.pdf "serial,1_worker,2_workers,3_workers,4_workers,5_workers" "Normal Transaction Execution Time (microseconds)" "Configurations"
+#paste -d ',' logs/simulated/ethereum_data_1_1/serial/be_ntt.csv logs/simulated/ethereum_data_1_1/1_worker/be_ntt.csv logs/simulated/ethereum_data_1_1/2_workers/be_ntt.csv logs/simulated/ethereum_data_1_1/3_workers/be_ntt.csv logs/simulated/ethereum_data_1_1/4_workers/be_ntt.csv logs/simulated/ethereum_data_1_1/5_workers/be_ntt.csv > logs/simulated/ethereum_data_1_1/be_ntt.csv
+#python plots/vPlot_ntt.py logs/simulated/ethereum_data_1_1/be_ntt.csv plots/bigquery/simulated/ethereum_data_1_1/be_ntt.pdf "serial,1_worker,2_workers,3_workers,4_workers,5_workers" "Normal Transaction Execution Time (microseconds)" "Configurations"
 
-#paste -d ',' data/bigquery/ethereum_data_1_1/serial/be_ctt.csv data/bigquery/ethereum_data_1_1/1_worker/be_ctt.csv data/bigquery/ethereum_data_1_1/2_workers/be_ctt.csv data/bigquery/ethereum_data_1_1/3_workers/be_ctt.csv data/bigquery/ethereum_data_1_1/4_workers/be_ctt.csv data/bigquery/ethereum_data_1_1/5_workers/be_ctt.csv > data/bigquery/ethereum_data_1_1/be_ctt.csv
-#python plots/vPlot_ctt.py data/bigquery/ethereum_data_1_1/be_ctt.csv plots/bigquery/ethereum_data_1_1/be_ctt.pdf "serial,1_worker,2_workers,3_workers,4_workers,5_workers" "Contract Transaction Execution Time (microseconds)" "Configurations"
-
-
+#paste -d ',' logs/simulated/ethereum_data_1_1/serial/be_ctt.csv logs/simulated/ethereum_data_1_1/1_worker/be_ctt.csv logs/simulated/ethereum_data_1_1/2_workers/be_ctt.csv logs/simulated/ethereum_data_1_1/3_workers/be_ctt.csv logs/simulated/ethereum_data_1_1/4_workers/be_ctt.csv logs/simulated/ethereum_data_1_1/5_workers/be_ctt.csv > logs/simulated/ethereum_data_1_1/be_ctt.csv
+#python plots/vPlot_ctt.py logs/simulated/ethereum_data_1_1/be_ctt.csv plots/bigquery/simulated/ethereum_data_1_1/be_ctt.pdf "serial,1_worker,2_workers,3_workers,4_workers,5_workers" "Contract Transaction Execution Time (microseconds)" "Configurations"
 
 
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_1/1_worker/be_e2e.csv > data/bigquery/ethereum_data_1_1/1_worker/be_e2e_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_1/2_workers/be_e2e.csv > data/bigquery/ethereum_data_1_1/2_workers/be_e2e_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_1/3_workers/be_e2e.csv > data/bigquery/ethereum_data_1_1/3_workers/be_e2e_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_1/4_workers/be_e2e.csv > data/bigquery/ethereum_data_1_1/4_workers/be_e2e_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_1/5_workers/be_e2e.csv > data/bigquery/ethereum_data_1_1/5_workers/be_e2e_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_1/serial/be_ctt.csv > data/bigquery/ethereum_data_1_1/serial/be_ctt_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_1/serial/be_e2e.csv > data/bigquery/ethereum_data_1_1/serial/be_e2e_milli.csv
 
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_2/1_worker/be_e2e.csv > data/bigquery/ethereum_data_1_2/1_worker/be_e2e_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_2/2_workers/be_e2e.csv > data/bigquery/ethereum_data_1_2/2_workers/be_e2e_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_2/3_workers/be_e2e.csv > data/bigquery/ethereum_data_1_2/3_workers/be_e2e_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_2/4_workers/be_e2e.csv > data/bigquery/ethereum_data_1_2/4_workers/be_e2e_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_2/5_workers/be_e2e.csv > data/bigquery/ethereum_data_1_2/5_workers/be_e2e_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_2/serial/be_ctt.csv > data/bigquery/ethereum_data_1_2/serial/be_ctt_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_2/serial/be_e2e.csv > data/bigquery/ethereum_data_1_2/serial/be_e2e_milli.csv
 
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_4/1_worker/be_e2e.csv > data/bigquery/ethereum_data_1_4/1_worker/be_e2e_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_4/2_workers/be_e2e.csv > data/bigquery/ethereum_data_1_4/2_workers/be_e2e_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_4/3_workers/be_e2e.csv > data/bigquery/ethereum_data_1_4/3_workers/be_e2e_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_4/4_workers/be_e2e.csv > data/bigquery/ethereum_data_1_4/4_workers/be_e2e_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_4/5_workers/be_e2e.csv > data/bigquery/ethereum_data_1_4/5_workers/be_e2e_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_4/serial/be_ctt.csv > data/bigquery/ethereum_data_1_4/serial/be_ctt_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_4/serial/be_e2e.csv > data/bigquery/ethereum_data_1_4/serial/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_1/1_worker/be_e2e.csv > logs/simulated/ethereum_data_1_1/1_worker/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_1/2_workers/be_e2e.csv > logs/simulated/ethereum_data_1_1/2_workers/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_1/3_workers/be_e2e.csv > logs/simulated/ethereum_data_1_1/3_workers/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_1/4_workers/be_e2e.csv > logs/simulated/ethereum_data_1_1/4_workers/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_1/5_workers/be_e2e.csv > logs/simulated/ethereum_data_1_1/5_workers/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_1/serial/be_ctt.csv > logs/simulated/ethereum_data_1_1/serial/be_ctt_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_1/serial/be_e2e.csv > logs/simulated/ethereum_data_1_1/serial/be_e2e_milli.csv
 
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_8/1_worker/be_e2e.csv > data/bigquery/ethereum_data_1_8/1_worker/be_e2e_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_8/2_workers/be_e2e.csv > data/bigquery/ethereum_data_1_8/2_workers/be_e2e_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_8/3_workers/be_e2e.csv > data/bigquery/ethereum_data_1_8/3_workers/be_e2e_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_8/4_workers/be_e2e.csv > data/bigquery/ethereum_data_1_8/4_workers/be_e2e_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_8/5_workers/be_e2e.csv > data/bigquery/ethereum_data_1_8/5_workers/be_e2e_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_8/serial/be_ctt.csv > data/bigquery/ethereum_data_1_8/serial/be_ctt_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_8/serial/be_e2e.csv > data/bigquery/ethereum_data_1_8/serial/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_2/1_worker/be_e2e.csv > logs/simulated/ethereum_data_1_2/1_worker/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_2/2_workers/be_e2e.csv > logs/simulated/ethereum_data_1_2/2_workers/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_2/3_workers/be_e2e.csv > logs/simulated/ethereum_data_1_2/3_workers/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_2/4_workers/be_e2e.csv > logs/simulated/ethereum_data_1_2/4_workers/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_2/5_workers/be_e2e.csv > logs/simulated/ethereum_data_1_2/5_workers/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_2/serial/be_ctt.csv > logs/simulated/ethereum_data_1_2/serial/be_ctt_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_2/serial/be_e2e.csv > logs/simulated/ethereum_data_1_2/serial/be_e2e_milli.csv
 
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_16/1_worker/be_e2e.csv > data/bigquery/ethereum_data_1_16/1_worker/be_e2e_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_16/2_workers/be_e2e.csv > data/bigquery/ethereum_data_1_16/2_workers/be_e2e_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_16/3_workers/be_e2e.csv > data/bigquery/ethereum_data_1_16/3_workers/be_e2e_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_16/4_workers/be_e2e.csv > data/bigquery/ethereum_data_1_16/4_workers/be_e2e_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_16/5_workers/be_e2e.csv > data/bigquery/ethereum_data_1_16/5_workers/be_e2e_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_16/serial/be_ctt.csv > data/bigquery/ethereum_data_1_16/serial/be_ctt_milli.csv
-awk -F '\t' '{print $1/1000}' data/bigquery/ethereum_data_1_16/serial/be_e2e.csv > data/bigquery/ethereum_data_1_16/serial/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_4/1_worker/be_e2e.csv > logs/simulated/ethereum_data_1_4/1_worker/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_4/2_workers/be_e2e.csv > logs/simulated/ethereum_data_1_4/2_workers/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_4/3_workers/be_e2e.csv > logs/simulated/ethereum_data_1_4/3_workers/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_4/4_workers/be_e2e.csv > logs/simulated/ethereum_data_1_4/4_workers/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_4/5_workers/be_e2e.csv > logs/simulated/ethereum_data_1_4/5_workers/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_4/serial/be_ctt.csv > logs/simulated/ethereum_data_1_4/serial/be_ctt_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_4/serial/be_e2e.csv > logs/simulated/ethereum_data_1_4/serial/be_e2e_milli.csv
+
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_8/1_worker/be_e2e.csv > logs/simulated/ethereum_data_1_8/1_worker/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_8/2_workers/be_e2e.csv > logs/simulated/ethereum_data_1_8/2_workers/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_8/3_workers/be_e2e.csv > logs/simulated/ethereum_data_1_8/3_workers/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_8/4_workers/be_e2e.csv > logs/simulated/ethereum_data_1_8/4_workers/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_8/5_workers/be_e2e.csv > logs/simulated/ethereum_data_1_8/5_workers/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_8/serial/be_ctt.csv > logs/simulated/ethereum_data_1_8/serial/be_ctt_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_8/serial/be_e2e.csv > logs/simulated/ethereum_data_1_8/serial/be_e2e_milli.csv
+
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_16/1_worker/be_e2e.csv > logs/simulated/ethereum_data_1_16/1_worker/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_16/2_workers/be_e2e.csv > logs/simulated/ethereum_data_1_16/2_workers/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_16/3_workers/be_e2e.csv > logs/simulated/ethereum_data_1_16/3_workers/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_16/4_workers/be_e2e.csv > logs/simulated/ethereum_data_1_16/4_workers/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_16/5_workers/be_e2e.csv > logs/simulated/ethereum_data_1_16/5_workers/be_e2e_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_16/serial/be_ctt.csv > logs/simulated/ethereum_data_1_16/serial/be_ctt_milli.csv
+awk -F '\t' '{print $1/1000}' logs/simulated/ethereum_data_1_16/serial/be_e2e.csv > logs/simulated/ethereum_data_1_16/serial/be_e2e_milli.csv

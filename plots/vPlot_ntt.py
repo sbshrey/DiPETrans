@@ -137,14 +137,14 @@ for i in range(0,len(inputFile.columns)):
 
 #Writing Median values
 for i in range(1,len(medians) + 1):
-    text(i,medians[i-1],'%.2f' % medians[i-1],horizontalalignment='right',color='red',size=12)
+    text(i,medians[i-1]-15,'%.2f' % medians[i-1],horizontalalignment='right',color='red',size=12)
     #print "medians[i-1]={0} .1f % medians[i-1]={1}".format(medians[i-1],'%.1f' % medians[i-1])
     f_median.write("{0}\n".format('%.1f' % medians[i-1]))
 
 
 #Writing Mean values
 for i in range(1,len(mean) + 1):
-    text(i,mean[i-1]+1500,'%.2f' % mean[i-1],horizontalalignment='right',color='purple',size=12)
+    text(i,mean[i-1]+15,'%.2f' % mean[i-1],horizontalalignment='right',color='purple',size=12)
 #    print "mean[i-1]={0} .1f' % mean[i-1]={1}".format(mean[i-1],'%.1f' % mean[i-1])
 #    f_mean.write("{0}\n".format('%.1f' % mean[i-1]))
 

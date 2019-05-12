@@ -1,7 +1,9 @@
 import sys
 import os
 
-dpath = "data/bigquery/ethereum_data_1_"
+dpath = "data/bigquery/simulated/ethereum_data_1_"
+
+
 
 size = {'1':4793,'2':7325,'4':12240,'8':23371,'16':43998}
 

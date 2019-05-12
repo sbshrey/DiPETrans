@@ -6,16 +6,16 @@ import time
 
 print "experiment started"
 
-path = "/home/skmonga/shrey/Distributed-Mining-contract/data/bigquery/4370000_4450000/ethereum_data_1_"
+path = "/home/skmonga/shrey/Distributed-Mining-contract/data/bigquery/simulated/ethereum_data_1_"
 
-logs_path = "/home/skmonga/shrey/Distributed-Mining-contract/logs/ethereum_data_1_"
+logs_path = "/home/skmonga/shrey/Distributed-Mining-contract/logs/simulated/ethereum_data_1_"
 
 
 port = 8090
 
 
 
-for i in [1]: #[1,2,4,8,16]:
+for i in [8,16]:
 	print "Updating data path"
 	data_path = "{}{}.json".format(path,i)
 	print data_path
@@ -26,7 +26,7 @@ for i in [1]: #[1,2,4,8,16]:
 
 	print "Running for differnt worker configurations"
 
-	for j in [0,1,2,3,4,5]:
+	for j in [1]:
 		print
 		processes = []
 		if j == 0:

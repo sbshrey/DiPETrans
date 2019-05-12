@@ -159,6 +159,9 @@ int main(int argc, char const *argv[])
     ofstream e2efile;
     e2efile.open(dir_path+"be_e2e.csv",std::ofstream::out | std::ofstream::app);
 
+    ofstream scfile;
+    scfile.open(dir_path+"sc_call.csv",std::ofstream::out | std::ofstream::app);
+
     int64_t index = 0;
 
   	for (json::iterator data = ethereum_data.begin(); data != ethereum_data.end(); ++data){
@@ -168,7 +171,8 @@ int main(int argc, char const *argv[])
   		//break;
 	    createBlock(data);
 	    block.number = index++;
-
+	    if (block.number >= 100) break;
+	    
 	    cout << block.number << "\t" << block.transactionsList.size() << endl;
 
 	    double normal_txn_time = 0;
@@ -181,56 +185,61 @@ int main(int argc, char const *argv[])
     	if (block.transactionsList.size() > 0) {
 		    for (auto const& tx: block.transactionsList) {
 		      //cout << tx.transactionID << "\t";
-		      auto txn_start = chrono::steady_clock::now();
-	  		  auto txn_end = chrono::steady_clock::now();
-		      double fee;
+				auto txn_start = chrono::steady_clock::now();
+				  auto txn_end = chrono::steady_clock::now();
+				double fee;
 
 
-		      bool status= false;
-		      if (tx.creates != "") {
-		        contract_addresses.push_back(tx.creates);
-		        status = execute(tx);
-		        txn_end = chrono::steady_clock::now();
-	        	contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
-	        	sc_cnt++;
-		      } else {
-		        std::vector<string>::iterator it = std::find (contract_addresses.begin(), contract_addresses.end(), tx.toAddress); 
-		        if (it != contract_addresses.end()) { 
-		            status = execute(tx);
-		            txn_end = chrono::steady_clock::now();
-	            	contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
-	            	sc_cnt++;
-		        } 
-		        else {
-		          if (DataItemsMap[tx.fromAddress] >= double(tx.value))
-		          {
-		            DataItemsMap[tx.fromAddress] = DataItemsMap[tx.fromAddress] - double(tx.value) - fee;
-		            DataItemsMap[tx.toAddress] = DataItemsMap[tx.toAddress] + double(tx.value);
-		            status = true;
-		          } else {
-		            status = false;
-		          }
-		          txn_end = chrono::steady_clock::now();
-		          normal_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
-		          nsc_cnt++;
-		        }
-		      }
+
+				bool status= false;
+				if (tx.creates != "") {
+					contract_addresses.push_back(tx.creates);
+					status = execute(tx);
+					txn_end = chrono::steady_clock::now();
+					contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
+					sc_cnt++;
+				} else {
+					std::vector<string>::iterator it = std::find (contract_addresses.begin(), contract_addresses.end(), tx.toAddress); 
+					if (it != contract_addresses.end()) {
+					 	if (tx.input.size() > 2) {
+						  //cout << "serial: " << tx.input.substr(0,10) << endl;
+						  scfile << tx.input.substr(0,10) << endl;
+						} 
+						status = execute(tx);
+						txn_end = chrono::steady_clock::now();
+						contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
+						sc_cnt++;
+					} 
+					else {
+					  if (DataItemsMap[tx.fromAddress] >= double(tx.value))
+					  {
+					    DataItemsMap[tx.fromAddress] = DataItemsMap[tx.fromAddress] - double(tx.value) - fee;
+					    DataItemsMap[tx.toAddress] = DataItemsMap[tx.toAddress] + double(tx.value);
+					    status = true;
+					  } else {
+					    status = false;
+					  }
+					  txn_end = chrono::steady_clock::now();
+					  normal_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
+					  nsc_cnt++;
+					}
+			    }
 		      
-		      if (status) {
-		        successful_transactions++;
-		      } else {
-		        failed_transactions++;
-		      }
+				if (status) {
+					successful_transactions++;
+				} else {
+					failed_transactions++;
+				}
 
-		      total_transactions++;
-		    }
+				total_transactions++;
+			}
 
-		cout << "sc " << sc_cnt << "\tnsc " << nsc_cnt << endl;
-		if (contract_txn_time > 0)
-			cttfile << contract_txn_time << endl;
-		if (normal_txn_time > 0)
-	    	nttfile << normal_txn_time << endl;
-		}	
+			cout << "sc " << sc_cnt << "\tnsc " << nsc_cnt << endl;
+			if (contract_txn_time > 0)
+				cttfile << contract_txn_time << endl;
+			if (normal_txn_time > 0)
+				nttfile << normal_txn_time << endl;
+		}
 
     	//Logger::instance().log("Block " + data.key() + " Block Execution ends", Logger::kLogLevelInfo);
 
@@ -242,6 +251,10 @@ int main(int argc, char const *argv[])
 		e2efile << chrono::duration_cast<chrono::microseconds>(end4 - start).count() << "\n";
 
 	}
+	nttfile.close();
+	cttfile.close();
+	e2efile.close();
+	scfile.close();
 
 	Logger::instance().log("Serial Execution ends", Logger::kLogLevelInfo);
 	

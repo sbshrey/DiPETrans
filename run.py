@@ -15,7 +15,7 @@ port = 8090
 
 
 
-for i in [8,16]:
+for i in [1]:
 	print "Updating data path"
 	data_path = "{}{}.json".format(path,i)
 	print data_path
@@ -26,7 +26,7 @@ for i in [8,16]:
 
 	print "Running for differnt worker configurations"
 
-	for j in [1]:
+	for j in [0,2,3,5]:
 		print
 		processes = []
 		if j == 0:

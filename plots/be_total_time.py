@@ -1,7 +1,7 @@
 import sys
 import os
 
-dpath = "data/bigquery/simulated/ethereum_data_1_"
+dpath = "logs/simulated/ethereum_data_1_"
 
 
 
@@ -78,4 +78,16 @@ for a in [1,2,4,8,16]:
 
 	os.system("paste -d ',' {0}serial/be_e2e_milli.csv {0}1_worker/be_e2e_milli.csv {0}2_workers/be_e2e_milli.csv {0}3_workers/be_e2e_milli.csv {0}4_workers/be_e2e_milli.csv {0}5_workers/be_e2e_milli.csv > {0}be_e2e_milli.csv".format(dir_path))
 	os.system('python plots/vPlot_e2e.py {0}be_e2e_milli.csv {0}be_e2e_milli.pdf "serial,1_worker,2_workers,3_workers,4_workers,5_workers" "End-to-End Execution Time (milliseconds)" "Configurations"'.format(dir_path))
+	
+
+	# without serial
+
+	#os.system("paste -d ',' {0}1_worker/be_ntt.csv {0}2_workers/be_ntt.csv {0}3_workers/be_ntt.csv {0}4_workers/be_ntt.csv {0}5_workers/be_ntt.csv > {0}be_ntt.csv".format(dir_path))
+	#os.system('python plots/vPlot_ntt.py {0}be_ntt.csv {0}be_ntt.pdf "1_worker,2_workers,3_workers,4_workers,5_workers" "Normal Transaction Execution Time (microseconds)" "Configurations"'.format(dir_path))
+
+	#os.system("paste -d ',' {0}1_worker/be_ctt.csv {0}2_workers/be_ctt.csv {0}3_workers/be_ctt.csv {0}4_workers/be_ctt.csv {0}5_workers/be_ctt.csv > {0}be_ctt.csv".format(dir_path))
+	#os.system('python plots/vPlot_ctt.py {0}be_ctt.csv {0}be_ctt.pdf "1_worker,2_workers,3_workers,4_workers,5_workers" "Contract Transaction Execution Time (milliseconds)" "Configurations"'.format(dir_path))
+
+	#os.system("paste -d ',' {0}1_worker/be_e2e_milli.csv {0}2_workers/be_e2e_milli.csv {0}3_workers/be_e2e_milli.csv {0}4_workers/be_e2e_milli.csv {0}5_workers/be_e2e_milli.csv > {0}be_e2e_milli.csv".format(dir_path))
+	#os.system('python plots/vPlot_e2e.py {0}be_e2e_milli.csv {0}be_e2e_milli.pdf "1_worker,2_workers,3_workers,4_workers,5_workers" "End-to-End Execution Time (milliseconds)" "Configurations"'.format(dir_path))
 	

@@ -241,10 +241,12 @@ void analyze(vector<Transaction> TransactionList) {
         } else {
           id = (id+1)%NUM_WORKERS;
         }
+
         ccID++;
       }
     }
   }
+  cout << "Connected components\t" << ccTransactionMap.size() << endl; 
 }
 
 /*
@@ -258,7 +260,7 @@ bool fileExists(const std::string& file) {
 
 void *connectWorker (void *threadarg) {
   //map< string,double> LocalDataItemMap;
-  map<string,DataItem> localDataItemMap;
+  
 
   struct thread_data *worker;
   worker = (struct thread_data *) threadarg;
@@ -279,14 +281,16 @@ void *connectWorker (void *threadarg) {
   // Creates data items map of address which are going to be modified by the transactions sent to worker
   // instead of sending complete map of addresses
 
-  std::vector<string> contractsList;
+  //std::vector<string> contractsList;
 
+  map<string,DataItem> localDataItemMap;
   for (auto& tx: sendTransactionMap[worker->workerID]) {
     // add code to get the current state of contract
     localDataItemMap[tx.fromAddress] = dataItemMap[tx.fromAddress];
-    localDataItemMap[tx.toAddress] = dataItemMap[tx.toAddress];
+    //localDataItemMap[tx.toAddress] = dataItemMap[tx.toAddress];
+    //localDataItemMap[tx.creates] = dataItemMap[tx.creates];
   }
-
+  //cout << localDataItemMap.size() << endl;
 
   Logger::instance().log(MSG+" Block "+to_string(worker->number) +" localDataItemMap generation for worker "+to_string(worker->workerID)+" ends", Logger::kLogLevelInfo);
   
@@ -295,13 +299,13 @@ void *connectWorker (void *threadarg) {
   WorkerResponse localWorkerResponse;
   
   workerClient.recvTransactions(localWorkerResponse,sendTransactionMap[worker->workerID],localDataItemMap); // returns local worker response
-
-  cout << worker->threadID << ":" << sendTransactionMap[worker->workerID].size() << "\n";
+  cout << worker->threadID << ":" << sendTransactionMap[worker->workerID].size() << ":" << localWorkerResponse.dataItemMap.size() << "\n";
   Logger::instance().log(MSG+" Block "+to_string(worker->number) +" WorkerID "+to_string(worker->workerID)+" recvTransactions() ends", Logger::kLogLevelInfo);
   
   map<string,DataItem>::iterator it;
   for (it = localWorkerResponse.dataItemMap.begin(); it != localWorkerResponse.dataItemMap.end(); ++it)
   {
+    //cout << "address " << it->first << endl;
     dataItemMap[it->first] = it->second;
     //dataItemMap[it->first].owner = it->second.owner;
     //dataItemMap[it->first].balances = it->second.balances;
@@ -338,11 +342,11 @@ class MasterServiceHandler : virtual public MasterServiceIf {
     Logger::instance().log(MSG+" Initializing accounts with 100000000000000000000000 wei to execute transactions starts", Logger::kLogLevelInfo);
     
     string line;
-    ifstream accounts_file ("data/block16/accounts.json");
+    ifstream accounts_file ("data/bigquery/addresses.json");
     //ifstream dataItem_file ("data/bigquery/dataItems.json");
     json accounts;
     accounts_file >> accounts;
-
+    cout << "accounts size " << accounts.size() << endl;
     // iterate the array
     for (json::iterator it = accounts.begin(); it != accounts.end(); ++it) {
       dataItemMap[it.key()].value = it.value();

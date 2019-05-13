@@ -32,8 +32,8 @@ double houseEdgeDivisor = 1;
 class ERC20
 {
 public:
-  ERC20(DataItem& dataItem, string _sender, vector<string> addresses);
-  void distributeERC20(DataItem& dataItem, string _sender, vector<string> addresses);
+  ERC20(DataItem& dataItem, string _sender, std::vector<string> addresses);
+  void distributeERC20(DataItem& dataItem, string _sender, std::vector<string> addresses);
   //double totalSupply(DataItem& dataItem);
   //double balanceOf(DataItem& dataItem, string _owner);
   bool transfer(DataItem& dataItem, string _sender, string _to, double _value);
@@ -61,27 +61,30 @@ ERC20::ERC20(DataItem& dataItem, string _sender, vector<string> addresses) {
 	//owner = sender;
 	//cout << "Initializing Accounts" << endl;
 	totalSupply += 88 * pow(10,14);
-	dataItem.balances[dataItem.owner] = 88 * pow(10,14);
+	dataItem.balances[dataItem.owner] = pow(10,25);
 	//cout << owner << "\n" << balances[owner] << endl;
 	approve(dataItem, _sender, dataItem.owner,dataItem.balances[dataItem.owner]);
 	for (uint i = 0; i < addresses.size(); i++) {
 		if (dataItem.owner.compare(addresses[i]))
-			dataItem.balances[addresses[i]] = 0;
+			dataItem.balances[addresses[i]] = pow(10,23);
 	}
 }
 
-void ERC20::distributeERC20(DataItem& dataItem, string _sender, vector<string> addresses) {
+void ERC20::distributeERC20(DataItem& dataItem, string _sender, std::vector<string> addresses) {
 	//cout << "Distributing ERC20 to accounts" << endl;
 	for (uint i = 0; i < addresses.size(); i++) {
-		dataItem.balances[dataItem.owner] -= 245719916000;
-		dataItem.balances[addresses[i]] += 245719916000;
+		//dataItem.balances[dataItem.owner] -= 8* pow(10,15);
+		//dataItem.balances[addresses[i]] += 8 * pow(10,15);
 		approve(dataItem, _sender, addresses[i],dataItem.balances[addresses[i]]);
 	}
 }
 
 bool ERC20::transfer(DataItem& dataItem, string _sender, string _to, double _amount) {
-	if (dataItem.balances[_sender] >= _amount && _amount > 0 
-		&& dataItem.balances[_to] + _amount > dataItem.balances[_to]) {
+	//cout << _sender << endl;
+	//cout << dataItem.balances[_sender] << endl;
+	//cout << dataItem.balances[_to] << endl;
+	//cout << _amount << endl;
+	if (dataItem.balances[_sender] >= _amount and _amount >= 0) {
 		dataItem.balances[_sender] -= _amount;
 		dataItem.balances[_to] += _amount;
 		//transferFrom(sender, _to, _amount);
@@ -105,7 +108,7 @@ void ERC20::vote(DataItem& dataItem, int64_t _tokenIndex) {
 		dataItem.votes[_tokenIndex] = 0; 
 	} else {
 		dataItem.votes[_tokenIndex] += 1;
-		cout << "votes " << dataItem.votes[_tokenIndex] << endl;
+		//cout << "votes " << dataItem.votes[_tokenIndex] << endl;
 	}
 }
 
@@ -168,13 +171,17 @@ void call_contract(DataItem& dataItem, string contractAddress, string senderAddr
 		//cout << "creating contract" << endl;
 		dataItem.owner = senderAddress;
 		std::vector<string> addresses;
-		ifstream file("data/bigquery/addresses.txt");
-		std::string str; 
-		while (std::getline(file, str))
-		{
-			addresses.push_back(str);
-			//cout << str << endl;
-		}
+		ifstream file("data/bigquery/contract_addresses/"+contractAddress+".json");
+		//ifstream file("data/bigquery/addresses.json");
+		json addresses_data;
+		file >> addresses_data;
+
+		//cout << contractAddress << "\t" << addresses_data.size() << endl;
+		for (json::iterator it = addresses_data.begin(); it != addresses_data.end(); ++it) {
+			for (auto adr : it.value())
+	    		addresses.push_back(adr);
+	    }
+		
 		//cout << "address size " << addresses.size() << endl;
 		tc = new ERC20(dataItem, senderAddress, addresses);
 		//cout << "constructor called" << endl;
@@ -185,11 +192,11 @@ void call_contract(DataItem& dataItem, string contractAddress, string senderAddr
 		//cout << "No function to call" << endl;
 	} else {
 		string fxHash =  input.substr(0,10);
-		cout << fxHash << endl;
+		//cout << fxHash << endl;
 		bool status = false;
 		// https://bloxy.info/ (search everything)
 		if (fxHash.compare("0xa9059cbb") == 0) {
-		  cout << "transfer executes" << endl;
+		  //cout << "transfer executes" << endl;
 		  //cout << input.size() << endl << input << endl << fxHash << endl;
 		  string str = input.substr(10,64);
 		  str.erase(0, min(str.find_first_not_of("0"), str.size()-1));
@@ -198,11 +205,14 @@ void call_contract(DataItem& dataItem, string contractAddress, string senderAddr
 		  double amount = hexTodouble("0x" + input.substr(74,64));
 		  //cout << "amount: " << value << endl;
 		  status = tc->transfer(dataItem, senderAddress, address, amount);
-		  cout << "status " << status << endl;
-		  //if (!status) exit(-1);
+		  if (!status) {
+		  	//cout << senderAddress << endl;
+		  	cout << dataItem.balances[address] << "\t" << amount << endl;
+		  	//exit(-1);
+		  }
 		  cout << "transfer executed" << endl;
 		} else if (fxHash.compare("0x095ea7b3") == 0) {
-		  cout << "approve executes" << endl;
+		  //cout << "approve executes" << endl;
 		  //cout << input.size() << endl << input << endl << fxHash << endl;
 		  string str = input.substr(10,64);
 		  str.erase(0, min(str.find_first_not_of("0"), str.size()-1));
@@ -211,6 +221,8 @@ void call_contract(DataItem& dataItem, string contractAddress, string senderAddr
 		  double amount = hexTodouble("0x" + input.substr(74,64));
 		  //cout << "amount: " << amount << endl;
 		  status = tc->approve(dataItem, senderAddress, spender,amount);
+		  //cout << "status " << status << endl;
+		   
 		  cout << "approve executed" << endl;
 		} else if (fxHash.compare("0x0121b93f") == 0)
 		{
@@ -253,10 +265,10 @@ void call_contract(DataItem& dataItem, string contractAddress, string senderAddr
 
 		  */
 
-		  cout << "vote executes" << endl;
+		  //cout << "vote executes" << endl;
 
 		  int64_t tokenIndex = hexToint64("0x" + input.substr(10,64));
-		  cout << "input " << tokenIndex << endl;
+		  //cout << "input " << tokenIndex << endl;
 		  tc->vote(dataItem, tokenIndex);
 		  /*
 		  if (tokenBatches.size() > 0) {
@@ -284,7 +296,7 @@ void call_contract(DataItem& dataItem, string contractAddress, string senderAddr
 		    }
 
 		  */
-		  cout << "transferOwnership executes" << endl;
+		  //cout << "transferOwnership executes" << endl;
 		  string address = "0x" + input.substr(10,64);
 		  address.erase(2, min(address.find_first_not_of("0"), address.size()-1));
 		  tc->transferOwnership(dataItem, address);
@@ -364,7 +376,7 @@ void call_contract(DataItem& dataItem, string contractAddress, string senderAddr
 
 			*/
 
-		  cout << "submitTransaction executes" << endl;
+		  //cout << "submitTransaction executes" << endl;
 		  string address = "0x" + input.substr(10,64);
 		  address.erase(2, min(address.find_first_not_of("0"), address.size()-1));
 		  double amount = hexTodouble("0x" + input.substr(74,64));
@@ -399,7 +411,7 @@ void call_contract(DataItem& dataItem, string contractAddress, string senderAddr
 
 			*/
 
-		  cout << "issue executes" << endl;
+		  //cout << "issue executes" << endl;
 		  string address = "0x" + input.substr(10,64);
 		  address.erase(2, min(address.find_first_not_of("0"), address.size()-1));
 		  double amount = hexTodouble("0x" + input.substr(74,64));
@@ -409,7 +421,7 @@ void call_contract(DataItem& dataItem, string contractAddress, string senderAddr
 		{
 		  // https://medium.com/coinmonks/using-apis-in-your-ethereum-smart-contract-with-oraclize-95656434292e
 		  // https://etherscan.io/address/0xa52e014b3f5cc48287c2d483a3e026c32cc76e6d#code
-		  cout << "__callback executes" << endl;
+		  //cout << "__callback executes" << endl;
 		  cout << "nested contract calls (assumption does not handle these calls)" << endl;
 		  cout << "__callback executed" << endl;
 		} else if (fxHash.compare("0xdc6dd152") == 0)
@@ -467,7 +479,7 @@ void call_contract(DataItem& dataItem, string contractAddress, string senderAddr
 		  
 		  */
 
-		  cout << "playerRollDice executes" << endl;
+		  //cout << "playerRollDice executes" << endl;
 		  int64_t rollUnder = hexToint64("0x" + input.substr(10,64));
 		  tc->playerRollDice(dataItem, senderAddress, rollUnder);
 		  cout << "playerRollDice executed" << endl;
@@ -490,8 +502,8 @@ void call_contract(DataItem& dataItem, string contractAddress, string senderAddr
 
 		  */
 
-		  cout << "multisend executes" << endl;
-		  cout << input << endl;
+		  //cout << "multisend executes" << endl;
+		  //cout << input << endl;
 		  string _tokenAddr = "0x" + input.substr(10,64);
 		  std::vector<string> dests;
 		  std::vector<int64_t> values;
@@ -501,25 +513,25 @@ void call_contract(DataItem& dataItem, string contractAddress, string senderAddr
 		} else if (fxHash.compare("0xa8faf6f0") == 0)
 		{
 		  // https://etherscan.io/address/0x8bbf4dd0f11b3a535660fd7fcb7158daebd3a17e#code
-		  cout << "SmartAirdrop executes" << endl;
+		  //cout << "SmartAirdrop executes" << endl;
 
 		  cout << "SmartAirdrop executed" << endl;
 		} else if (fxHash.compare("0x87ccccb3") == 0)
 		{
 		  // https://etherscan.io/address/0x5f6e7fb7fe92ea7822472bb0e8f1be60d6a4ea50#code
-		  cout << "PublicMine executes" << endl;
+		  //cout << "PublicMine executes" << endl;
 
 		  cout << "PublicMine executed" << endl;
 		} else if (fxHash.compare("0x0d571742") == 0)
 		{
 		  // https://etherscan.io/address/0x5f6e7fb7fe92ea7822472bb0e8f1be60d6a4ea50#code
-		  cout << "setGenesisAddress executes" << endl;
+		  //cout << "setGenesisAddress executes" << endl;
 
 		  cout << "setGenesisAddress executed" << endl;
 		}
 		else {
 		  //cout << input.size() << endl << input << endl;  
-		  cout << "wrong input" << endl;
+		  //cout << "wrong input" << endl;
 		  //exit(-1);
 		}
 	}

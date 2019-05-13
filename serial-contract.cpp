@@ -15,16 +15,27 @@
 #include <sstream>
 #include <iomanip>
 
+#include "contract.h"
+#include "utils.h"
+
 //#include <CkCrypt2.h>
 //#include <CkPrivateKey.h>
 //#include <CkPrng.h>
 //#include <CkEcc.h>
 //#include <CkPublicKey.h>
 
+#include "gen-cpp/MasterService.h"
+#include "gen-cpp/WorkerService.h"
+#include "gen-cpp/SharedService.h"
 
 using json = nlohmann::json;
 
 using namespace std;
+
+
+using namespace  ::MasterService;
+using namespace  ::WorkerService;
+using namespace  ::SharedService;
 
 
 /*struct Uncle {
@@ -33,6 +44,7 @@ using namespace std;
 };
 */
 
+/*
 struct Transaction
 {
 	int64_t transactionID;
@@ -58,9 +70,11 @@ struct Block
 	//std::vector<Uncle> unclesList;	
 };
 
+*/
 
 
-std::map<string, double> DataItemsMap;
+
+map<string,DataItem> dataItemMap;
 
 std::vector<string> contract_addresses;
 
@@ -79,16 +93,18 @@ void clear_memory() {
 // create initial state of data items map
 void genesis() {
 	string line;
-	ifstream accounts_file ("data/block16/accounts.json");
+	//ifstream accounts_file ("data/block16/accounts.json");
+	ifstream accounts_file ("data/bigquery/addresses.json");
 	json accounts;
 	accounts_file >> accounts;
-
+	cout << "accounts size " << accounts.size() << endl;
 	// iterate the array
 	for (json::iterator it = accounts.begin(); it != accounts.end(); ++it) {
-		DataItemsMap[it.key()] = it.value();
+		dataItemMap[it.key()].value = it.value();
 	}
 }
 
+/*
 bool execute (Transaction transaction) {
 
 	bool status = false;
@@ -104,14 +120,14 @@ bool execute (Transaction transaction) {
 	
 	return true;
 }
+*/
+
 
 
 void createBlock(json::iterator data) {
-
-
   Logger::instance().log(MSG+" Block "+to_string(block.number)+" creation starts", Logger::kLogLevelInfo);
-  //block.number = index++; //stoi(data.key());
-
+  //block.number = index++;stoi(data.key());//atoi(d.key().c_str());
+  
   Logger::instance().log(MSG+" Block "+to_string(block.number)+" transactionsList starts", Logger::kLogLevelInfo);
   int16_t txid=0;
   for (auto& tx: (*data)["transactions"]) {
@@ -121,12 +137,11 @@ void createBlock(json::iterator data) {
     transaction.toAddress = tx["to"];
     transaction.value = tx["value"].get<double>();
     transaction.input = tx["input"];
-    transaction.creates = tx["creates"];
-
+    transaction.creates = tx["creates"]; 
     block.transactionsList.push_back(transaction);
   }
   Logger::instance().log(MSG+" Block "+to_string(block.number)+" transactionsList ends", Logger::kLogLevelInfo);
-  
+
   Logger::instance().log(MSG+" Block "+to_string(block.number)+" creation ends", Logger::kLogLevelInfo);
 }
 
@@ -134,7 +149,7 @@ void createBlock(json::iterator data) {
 
 int main(int argc, char const *argv[])
 {
-	
+	// initializing accounts 
 	genesis();
 	
 	json ethereum_data;
@@ -171,7 +186,7 @@ int main(int argc, char const *argv[])
   		//break;
 	    createBlock(data);
 	    block.number = index++;
-	    if (block.number >= 100) break;
+	    //if (block.number >= 100) break;
 	    
 	    cout << block.number << "\t" << block.transactionsList.size() << endl;
 
@@ -186,7 +201,7 @@ int main(int argc, char const *argv[])
 		    for (auto const& tx: block.transactionsList) {
 		      //cout << tx.transactionID << "\t";
 				auto txn_start = chrono::steady_clock::now();
-				  auto txn_end = chrono::steady_clock::now();
+				auto txn_end = chrono::steady_clock::now();
 				double fee;
 
 
@@ -194,35 +209,48 @@ int main(int argc, char const *argv[])
 				bool status= false;
 				if (tx.creates != "") {
 					contract_addresses.push_back(tx.creates);
-					status = execute(tx);
-					txn_end = chrono::steady_clock::now();
+					DataItem localDataItem;
+        			call_contract(localDataItem, tx.creates, tx.fromAddress, tx.toAddress, tx.value);
+        			dataItemMap[tx.creates] =  localDataItem;
+        			txn_end = chrono::steady_clock::now();
 					contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
 					sc_cnt++;
 				} else {
-					std::vector<string>::iterator it = std::find (contract_addresses.begin(), contract_addresses.end(), tx.toAddress); 
-					if (it != contract_addresses.end()) {
-					 	if (tx.input.size() > 2) {
-						  //cout << "serial: " << tx.input.substr(0,10) << endl;
-						  scfile << tx.input.substr(0,10) << endl;
-						} 
-						status = execute(tx);
-						txn_end = chrono::steady_clock::now();
-						contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
-						sc_cnt++;
-					} 
-					else {
-					  if (DataItemsMap[tx.fromAddress] >= double(tx.value))
-					  {
-					    DataItemsMap[tx.fromAddress] = DataItemsMap[tx.fromAddress] - double(tx.value) - fee;
-					    DataItemsMap[tx.toAddress] = DataItemsMap[tx.toAddress] + double(tx.value);
-					    status = true;
-					  } else {
-					    status = false;
-					  }
-					  txn_end = chrono::steady_clock::now();
-					  normal_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
-					  nsc_cnt++;
-					}
+					bool flag = false;
+			        std::vector<string>::iterator it = std::find (contract_addresses.begin(), contract_addresses.end(), tx.toAddress); 
+			        if (it != contract_addresses.end()) {  
+			          DataItem localDataItem = dataItemMap[tx.toAddress];
+			          call_contract(localDataItem, tx.toAddress, tx.fromAddress, tx.input, tx.value);
+			          dataItemMap[tx.toAddress] =  localDataItem;
+			          txn_end = chrono::steady_clock::now();
+			          contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
+			          sc_cnt++;
+			          flag = true;
+			        }
+
+			        it = std::find (contract_addresses.begin(), contract_addresses.end(), tx.fromAddress); 
+			        if (it != contract_addresses.end() and !flag) {  
+			          DataItem localDataItem = dataItemMap[tx.fromAddress];
+			          call_contract(localDataItem, tx.fromAddress, tx.toAddress, tx.input, tx.value);
+			          dataItemMap[tx.fromAddress] = localDataItem;
+			          txn_end = chrono::steady_clock::now();
+			          contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
+			          sc_cnt++;
+			          flag = true;
+			        }
+
+			        if (!flag) {
+			          if (dataItemMap[tx.fromAddress].value >= double(tx.value)) {
+			            dataItemMap[tx.fromAddress].value -=  (double(tx.value) - fee);
+			            dataItemMap[tx.toAddress].value += double(tx.value);
+			            status = true;  
+			          } else {
+			            status = false;
+			          }
+			          txn_end = chrono::steady_clock::now();
+			          normal_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
+			          nsc_cnt++;
+			        }
 			    }
 		      
 				if (status) {
@@ -241,6 +269,8 @@ int main(int argc, char const *argv[])
 				nttfile << normal_txn_time << endl;
 		}
 
+		//cout << "success: " << successful_transactions << endl;
+		//cout << "failed " << failed_transactions << endl;
     	//Logger::instance().log("Block " + data.key() + " Block Execution ends", Logger::kLogLevelInfo);
 
     	Logger::instance().log(MSG+" Block "+to_string(block.number)+" clear_memory starts", Logger::kLogLevelInfo);

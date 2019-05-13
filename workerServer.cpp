@@ -37,7 +37,7 @@ using namespace  ::SharedService;
 
 std::map<string, int64_t> GlobalDataItemsMap;
 std::vector<string> contract_addresses;
-std::vector<string> addresses;
+//std::vector<string> addresses;
     
 
 string WID = "1";
@@ -128,14 +128,23 @@ bool execute (Transaction transaction, int status) {
 class WorkerServiceHandler : virtual public WorkerServiceIf {
  public:
   WorkerServiceHandler() {
-    // Your initialization goes here    
-    ifstream file("data/bigquery/addresses.txt");
-    std::string str; 
-    while (std::getline(file, str))
-    {
-      addresses.push_back(str);
-      //cout << str << endl;
+    // Your initialization goes here
+    
+    /*Logger::instance().log(MSG+" Initializing accounts with 100000000000000000000000 wei to execute transactions starts", Logger::kLogLevelInfo);
+    
+    string line;
+    ifstream accounts_file ("data/bigquery/addresses.json");
+    //ifstream dataItem_file ("data/bigquery/dataItems.json");
+    json accounts;
+    accounts_file >> accounts;
+
+    // iterate the array
+    for (json::iterator it = accounts.begin(); it != accounts.end(); ++it) {
+      dataItemMap[it.key()].value = it.value();
     }
+    Logger::instance().log(MSG+" Initializing accounts with 100000000000000000000000 wei to execute transactions ends", Logger::kLogLevelInfo);
+    */    
+    
   }
 
   void recvTransactions( ::SharedService::WorkerResponse& _return, const std::vector< ::SharedService::Transaction> & TransactionsList, const std::map<std::string,  ::SharedService::DataItem> & dataItemMap) {
@@ -179,19 +188,10 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
       
       bool status= false;
       if (tx.creates != "") {
-        //cout << "creates contract: " << tx.creates << endl;
         contract_addresses.push_back(tx.creates);
         DataItem localDataItem;
         call_contract(localDataItem, tx.creates, tx.fromAddress, tx.toAddress, tx.value);
-        //cout << "contract created" << endl;
         _return.dataItemMap[tx.creates] =  localDataItem;
-        //cout << "contract state saved" << endl;
-        // status = execute(tx, 0);
-        // call_contract(tx.creates, )
-        //ERC20 *tc = new ERC20(addresses);
-        //tc->distributeERC20(addresses);
-
-
         txn_end = chrono::steady_clock::now();
         contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
         sc_cnt++;
@@ -199,14 +199,6 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
         bool flag = false;
         std::vector<string>::iterator it = std::find (contract_addresses.begin(), contract_addresses.end(), tx.toAddress); 
         if (it != contract_addresses.end()) {  
-          //if (tx.input.size() > 2) {
-            //cout << "worker_" + WID + " : " << tx.input.substr(0,10) << endl;
-          //  scfile << tx.input.substr(0,10) << endl;
-          //}
-          //status = execute(tx, 1);
-          
-          //cout << "calling toAddress " << tx.toAddress << endl;
-          //cout << "input " << tx.input << endl;
           DataItem localDataItem = _return.dataItemMap[tx.toAddress];
           call_contract(localDataItem, tx.toAddress, tx.fromAddress, tx.input, tx.value);
           _return.dataItemMap[tx.toAddress] =  localDataItem;
@@ -217,13 +209,7 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
         }
 
         it = std::find (contract_addresses.begin(), contract_addresses.end(), tx.fromAddress); 
-        if (it != contract_addresses.end() and !flag) {  
-          if (tx.input.size() > 2) {
-            //cout << "worker_" + WID + " : " << tx.input.substr(0,10) << endl;
-            scfile << tx.input.substr(0,10) << endl;
-          }
-          //status = execute(tx, 2);
-          //cout << "calling fromAddress " << tx.fromAddress << endl; 
+        if (it != contract_addresses.end() and !flag) {   
           DataItem localDataItem = _return.dataItemMap[tx.fromAddress];
           call_contract(localDataItem, tx.fromAddress, tx.toAddress, tx.input, tx.value);
           _return.dataItemMap[tx.fromAddress] = localDataItem;
@@ -232,7 +218,7 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
           sc_cnt++;
           flag = true;
         }
-
+        
         if (!flag) {
           if (_return.dataItemMap[tx.fromAddress].value >= double(tx.value)) {
             _return.dataItemMap[tx.fromAddress].value -=  (double(tx.value) - fee);
@@ -259,11 +245,11 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
     }
 
     cout << "WID " << WID << "\tsc " << sc_cnt << "\tnsc " << nsc_cnt << endl;
-
+    cout << "_return.dataItemMap size " << _return.dataItemMap.size() << endl;
     cttfile << contract_txn_time << endl;
     nttfile << normal_txn_time << endl;
 
-    _return.transactionFees = tx_fees;
+    //_return.transactionFees = tx_fees;
     Logger::instance().log(MSG+" TransactionsList ends", Logger::kLogLevelInfo);
 
     Logger::instance().log(MSG+" worker "+ WID +" recvTransactions ends", Logger::kLogLevelInfo);

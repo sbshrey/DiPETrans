@@ -118,8 +118,8 @@ bool execute (Transaction transaction, int status) {
 */
 
 
-
-
+ofstream nttfile;
+ofstream cttfile;
 
 
 
@@ -145,16 +145,18 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
     Logger::instance().log(MSG+" Initializing accounts with 100000000000000000000000 wei to execute transactions ends", Logger::kLogLevelInfo);
     */    
     
+     
+    nttfile.open(dir_path + "be_ntt_"+WID+".log",std::ofstream::out | std::ofstream::trunc);
+    
+    cttfile.open(dir_path + "be_ctt_"+WID+".log",std::ofstream::out | std::ofstream::trunc);
+    
   }
 
   void recvTransactions( ::SharedService::WorkerResponse& _return, const std::vector< ::SharedService::Transaction> & TransactionsList, const std::map<std::string,  ::SharedService::DataItem> & dataItemMap) {
     // Your implementation goes here
-    ofstream nttfile;
-    nttfile.open(dir_path + "be_ntt_"+WID+".log",std::ofstream::out | std::ofstream::app);
-    ofstream cttfile;
-    cttfile.open(dir_path + "be_ctt_"+WID+".log",std::ofstream::out | std::ofstream::app);
-    ofstream scfile;
-    scfile.open(dir_path+"sc_call.csv",std::ofstream::out | std::ofstream::app);
+    
+
+
     double normal_txn_time = 0;
     double contract_txn_time = 0;
 
@@ -173,7 +175,8 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
     Logger::instance().log(MSG+" dataItemMap starts", Logger::kLogLevelInfo);
     for (auto const& address: dataItemMap)
     {
-      _return.dataItemMap[address.first].value = address.second.value;
+      _return.dataItemMap[address.first] = address.second;
+      //cout << "txn value at worker " << _return.dataItemMap[address.first].value << "\t" << address.second.value << endl;
     }
     Logger::instance().log(MSG+" dataItemMap ends", Logger::kLogLevelInfo);
 
@@ -187,11 +190,21 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
 
       
       bool status= false;
-      if (tx.creates != "") {
+      if (tx.toAddress == "creates") {
         contract_addresses.push_back(tx.creates);
         DataItem localDataItem;
-        call_contract(localDataItem, tx.creates, tx.fromAddress, tx.toAddress, tx.value);
-        _return.dataItemMap[tx.creates] =  localDataItem;
+        call_contract(&localDataItem, tx.creates, tx.fromAddress, tx.toAddress, tx.value);
+        
+        //cout << "size before " << _return.dataItemMap[tx.creates].balances.size() << endl;
+        //_return.dataItemMap[tx.creates].value = localDataItem.value;
+        _return.dataItemMap[tx.creates] = localDataItem;
+        //_return.dataItemMap[tx.creates].balances = localDataItem.balances;
+        //_return.dataItemMap[tx.creates].allowed = localDataItem.allowed;
+        //_return.dataItemMap[tx.creates].votes = localDataItem.votes;
+        //_return.dataItemMap[tx.creates].balances = localDataItem.balances;
+
+        //cout << "size after " << _return.dataItemMap[tx.creates].balances.size() << endl;
+        //_return.dataItemMap[tx.creates].balances =  localDataItem.balances;
         txn_end = chrono::steady_clock::now();
         contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
         sc_cnt++;
@@ -200,8 +213,16 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
         std::vector<string>::iterator it = std::find (contract_addresses.begin(), contract_addresses.end(), tx.toAddress); 
         if (it != contract_addresses.end()) {  
           DataItem localDataItem = _return.dataItemMap[tx.toAddress];
-          call_contract(localDataItem, tx.toAddress, tx.fromAddress, tx.input, tx.value);
-          _return.dataItemMap[tx.toAddress] =  localDataItem;
+          call_contract(&localDataItem, tx.toAddress, tx.fromAddress, tx.input, tx.value);
+          _return.dataItemMap[tx.toAddress] = localDataItem;
+          //_return.dataItemMap[tx.toAddress].value = localDataItem.value;
+          //strcpy(_return.dataItemMap[tx.toAddress].owner,localDataItem.owner);
+          //_return.dataItemMap[tx.toAddress].owner = localDataItem.owner;
+          //_return.dataItemMap[tx.toAddress].balances = localDataItem.balances;
+          //_return.dataItemMap[tx.toAddress].allowed = localDataItem.allowed;
+          //_return.dataItemMap[tx.toAddress].votes = localDataItem.votes;
+        
+          //_return.dataItemMap[tx.toAddress].balances =  localDataItem.balances;
           txn_end = chrono::steady_clock::now();
           contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
           sc_cnt++;
@@ -211,20 +232,29 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
         it = std::find (contract_addresses.begin(), contract_addresses.end(), tx.fromAddress); 
         if (it != contract_addresses.end() and !flag) {   
           DataItem localDataItem = _return.dataItemMap[tx.fromAddress];
-          call_contract(localDataItem, tx.fromAddress, tx.toAddress, tx.input, tx.value);
+          call_contract(&localDataItem, tx.fromAddress, tx.toAddress, tx.input, tx.value);
           _return.dataItemMap[tx.fromAddress] = localDataItem;
+          
+          //_return.dataItemMap[tx.fromAddress].value = localDataItem.value;
+          //_return.dataItemMap[tx.fromAddress].owner = localDataItem.owner;
+          //_return.dataItemMap[tx.fromAddress].balances = localDataItem.balances;
+          //_return.dataItemMap[tx.fromAddress].allowed = localDataItem.allowed;
+          //_return.dataItemMap[tx.fromAddress].votes = localDataItem.votes;
+        
+          //_return.dataItemMap[tx.fromAddress].balances = localDataItem.balances;
           txn_end = chrono::steady_clock::now();
           contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
           sc_cnt++;
           flag = true;
         }
-        
+
         if (!flag) {
-          if (_return.dataItemMap[tx.fromAddress].value >= double(tx.value)) {
-            _return.dataItemMap[tx.fromAddress].value -=  (double(tx.value) - fee);
-            _return.dataItemMap[tx.toAddress].value += double(tx.value);
+          if (_return.dataItemMap[tx.fromAddress].value >= tx.value) {
+            _return.dataItemMap[tx.fromAddress].value -=  tx.value;
+            _return.dataItemMap[tx.toAddress].value += tx.value;
             status = true;  
           } else {
+            cout << "nsc txn " << _return.dataItemMap[tx.fromAddress].value << "\t" << tx.value << endl;
             status = false;
           }
           txn_end = chrono::steady_clock::now();
@@ -245,7 +275,12 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
     }
 
     cout << "WID " << WID << "\tsc " << sc_cnt << "\tnsc " << nsc_cnt << endl;
-    cout << "_return.dataItemMap size " << _return.dataItemMap.size() << endl;
+    //cout << "_return.dataItemMap size " << _return.dataItemMap.size() << endl;
+
+    
+    //ofstream scfile;
+    //scfile.open(dir_path+"sc_call.csv",std::ofstream::out | std::ofstream::trunc);
+
     cttfile << contract_txn_time << endl;
     nttfile << normal_txn_time << endl;
 

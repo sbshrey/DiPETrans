@@ -8,6 +8,7 @@
 #include <thread>
 #include <vector>
 #include <map>
+#include <set>
 #include <bits/stdc++.h> 
 #include "nlohmann/json.hpp"
 
@@ -32,61 +33,61 @@ double houseEdgeDivisor = 1;
 class ERC20
 {
 public:
-  ERC20(DataItem& dataItem, string _sender, std::vector<string> addresses);
-  void distributeERC20(DataItem& dataItem, string _sender, std::vector<string> addresses);
-  //double totalSupply(DataItem& dataItem);
-  //double balanceOf(DataItem& dataItem, string _owner);
-  bool transfer(DataItem& dataItem, string _sender, string _to, double _value);
-  bool transferFrom(DataItem& dataItem, string _from, string _to, double _value);
-  bool approve(DataItem& dataItem, string _sender, string _spender, double _value);
-  double allowance(DataItem& dataItem, string _owner, string _spender);
-  void deposit(DataItem& dataItem);
-  void depositToken(DataItem& dataItem, string token, double amount);
-  void withdraw(DataItem& dataItem, double amount);
-  void withdrawToken(DataItem& dataItem, string token, double amount);
+  ERC20(DataItem  *dataItem, string _sender, std::set<string> addresses);
+  void distributeERC20(DataItem* dataItem, string _sender, std::set<string> addresses);
+  //double totalSupply(DataItem* dataItem);
+  //double balanceOf(DataItem* dataItem, string _owner);
+  bool transfer(DataItem* dataItem, string _sender, string _to, double _value);
+  bool transferFrom(DataItem* dataItem, string _from, string _to, double _value);
+  bool approve(DataItem* dataItem, string _sender, string _spender, double _value);
+  double allowance(DataItem* dataItem, string _owner, string _spender);
+  void deposit(DataItem* dataItem);
+  void depositToken(DataItem* dataItem, string token, double amount);
+  void withdraw(DataItem* dataItem, double amount);
+  void withdrawToken(DataItem* dataItem, string token, double amount);
   
-  void vote(DataItem& dataItem, int64_t _tokenIndex);
-  void transferOwnership(DataItem& dataItem, string address);
-  void submitTransaction(DataItem& dataItem, string _sender, string _address, double _amount, string _data);
-  void issue(DataItem& dataItem, string _to, double _amount);
-  void playerRollDice(DataItem& dataItem, string _sender, int64_t _rollUnder);
-  void multisend(DataItem& dataItem, string _tokenAddr, std::vector<string> dests, std::vector<int64_t> values);
+  void vote(DataItem* dataItem, int64_t _tokenIndex);
+  void transferOwnership(DataItem* dataItem, string address);
+  void submitTransaction(DataItem* dataItem, string _sender, string _address, double _amount, string _data);
+  void issue(DataItem* dataItem, string _to, double _amount);
+  void playerRollDice(DataItem* dataItem, string _sender, int64_t _rollUnder);
+  void multisend(DataItem* dataItem, string _tokenAddr, std::vector<string> dests, std::vector<int64_t> values);
 
   ~ERC20();
   
 };
 
 
-ERC20::ERC20(DataItem& dataItem, string _sender, vector<string> addresses) {
+ERC20::ERC20(DataItem* dataItem, string _sender, set<string> addresses) {
 	//owner = sender;
 	//cout << "Initializing Accounts" << endl;
 	totalSupply += 88 * pow(10,14);
-	dataItem.balances[dataItem.owner] = pow(10,25);
+	dataItem->balances[dataItem->owner] = pow(10,25);
 	//cout << owner << "\n" << balances[owner] << endl;
-	approve(dataItem, _sender, dataItem.owner,dataItem.balances[dataItem.owner]);
-	for (uint i = 0; i < addresses.size(); i++) {
-		if (dataItem.owner.compare(addresses[i]))
-			dataItem.balances[addresses[i]] = pow(10,23);
+	approve(dataItem, _sender, dataItem->owner,dataItem->balances[dataItem->owner]);
+	for (auto adr : addresses) {
+		if (dataItem->owner.compare(adr))
+			dataItem->balances[adr] = pow(10,23);
 	}
 }
 
-void ERC20::distributeERC20(DataItem& dataItem, string _sender, std::vector<string> addresses) {
+void ERC20::distributeERC20(DataItem* dataItem, string _sender, std::set<string> addresses) {
 	//cout << "Distributing ERC20 to accounts" << endl;
-	for (uint i = 0; i < addresses.size(); i++) {
-		//dataItem.balances[dataItem.owner] -= 8* pow(10,15);
-		//dataItem.balances[addresses[i]] += 8 * pow(10,15);
-		approve(dataItem, _sender, addresses[i],dataItem.balances[addresses[i]]);
+	for (auto adr: addresses) {
+		//dataItem->balances[dataItem->owner] -= 8* pow(10,15);
+		//dataItem->balances[addresses[i]] += 8 * pow(10,15);
+		approve(dataItem, _sender, adr, dataItem->balances[adr]);
 	}
 }
 
-bool ERC20::transfer(DataItem& dataItem, string _sender, string _to, double _amount) {
+bool ERC20::transfer(DataItem* dataItem, string _sender, string _to, double _amount) {
 	//cout << _sender << endl;
-	//cout << dataItem.balances[_sender] << endl;
-	//cout << dataItem.balances[_to] << endl;
+	//cout << dataItem->balances[_sender] << endl;
+	//cout << dataItem->balances[_to] << endl;
 	//cout << _amount << endl;
-	if (dataItem.balances[_sender] >= _amount and _amount >= 0) {
-		dataItem.balances[_sender] -= _amount;
-		dataItem.balances[_to] += _amount;
+	if (dataItem->balances[_sender] >= _amount and _amount >= 0) {
+		dataItem->balances[_sender] -= _amount;
+		dataItem->balances[_to] += _amount;
 		//transferFrom(sender, _to, _amount);
 		//cout << sender << "\t" << _to << "\t" << _amount << endl;
 		return true;
@@ -96,59 +97,59 @@ bool ERC20::transfer(DataItem& dataItem, string _sender, string _to, double _amo
 	}
 }
 
-bool ERC20::approve(DataItem& dataItem, string _sender, string _spender, double _amount) {
-	dataItem.allowed[_sender][_spender] = _amount;
+bool ERC20::approve(DataItem* dataItem, string _sender, string _spender, double _amount) {
+	dataItem->allowed[_sender][_spender] = _amount;
 	//Approval(sender, _spender, _amount);
 	return true;
 }
 
-void ERC20::vote(DataItem& dataItem, int64_t _tokenIndex) {
-	auto it = dataItem.votes.find(_tokenIndex);
-	if (it == dataItem.votes.end()) {
-		dataItem.votes[_tokenIndex] = 0; 
+void ERC20::vote(DataItem* dataItem, int64_t _tokenIndex) {
+	auto it = dataItem->votes.find(_tokenIndex);
+	if (it == dataItem->votes.end()) {
+		dataItem->votes[_tokenIndex] = 0; 
 	} else {
-		dataItem.votes[_tokenIndex] += 1;
-		//cout << "votes " << dataItem.votes[_tokenIndex] << endl;
+		dataItem->votes[_tokenIndex] += 1;
+		//cout << "votes " << dataItem->votes[_tokenIndex] << endl;
 	}
 }
 
 
-void ERC20::transferOwnership(DataItem& dataItem, string newOwner) {
-	if (newOwner != dataItem.owner) {
-		dataItem.owner = newOwner;
+void ERC20::transferOwnership(DataItem* dataItem, string newOwner) {
+	if (newOwner != dataItem->owner) {
+		dataItem->owner = newOwner;
 
 	}
 }
 
-void ERC20::submitTransaction(DataItem& dataItem, string _sender, string _address, double _amount, string _data) {
+void ERC20::submitTransaction(DataItem* dataItem, string _sender, string _address, double _amount, string _data) {
 	Transaction transaction;
 	transaction.fromAddress = _sender;
 	transaction.toAddress = _address;
 	transaction.value = _amount;
 	transaction.input = _data;
 	transaction.creates = "";
-	dataItem.transactions.push_back(transaction);
+	dataItem->transactions.push_back(transaction);
 }
 
-void ERC20::issue(DataItem& dataItem, string _to, double _amount) {
+void ERC20::issue(DataItem* dataItem, string _to, double _amount) {
 	totalSupply += _amount;
-	dataItem.balances[_to] += _amount;
+	dataItem->balances[_to] += _amount;
 }
 
 
-void ERC20::playerRollDice(DataItem& dataItem, string _sender, int64_t _rollUnder) {
+void ERC20::playerRollDice(DataItem* dataItem, string _sender, int64_t _rollUnder) {
 	PlayerRoll playerRoll;
 	playerRoll.playerNumber = _rollUnder;
-	playerRoll.playerBetValue = dataItem.value;
+	playerRoll.playerBetValue = dataItem->value;
 	playerRoll.playerAddress = _sender;
-	playerRoll.playerProfit = ((((dataItem.value * (100-(_rollUnder - 1))) / (_rollUnder - 1)+dataItem.value))*houseEdge/houseEdgeDivisor)-dataItem.value;
+	playerRoll.playerProfit = ((((dataItem->value * (100-(_rollUnder - 1))) / (_rollUnder - 1)+dataItem->value))*houseEdge/houseEdgeDivisor)-dataItem->value;
 
 	string playerBetId = sha256(to_string(playerRoll.playerNumber) + to_string(playerRoll.playerBetValue) + playerRoll.playerAddress + to_string(playerRoll.playerProfit)); 
-	dataItem.playerRolls[playerBetId] = playerRoll;
+	dataItem->playerRolls[playerBetId] = playerRoll;
 }
 
 
-void call_contract(DataItem& dataItem, string contractAddress, string senderAddress, string input, double value) {
+void call_contract(DataItem *dataItem, string contractAddress, string senderAddress, string input, double value) {
   /*
 
 	struct DataItem {
@@ -169,8 +170,8 @@ void call_contract(DataItem& dataItem, string contractAddress, string senderAddr
 	//cout << input << endl;
 	if (input == "creates") {
 		//cout << "creating contract" << endl;
-		dataItem.owner = senderAddress;
-		std::vector<string> addresses;
+		dataItem->owner = senderAddress;
+		std::set<string> addresses;
 		ifstream file("data/bigquery/contract_addresses/"+contractAddress+".json");
 		//ifstream file("data/bigquery/addresses.json");
 		json addresses_data;
@@ -179,7 +180,8 @@ void call_contract(DataItem& dataItem, string contractAddress, string senderAddr
 		//cout << contractAddress << "\t" << addresses_data.size() << endl;
 		for (json::iterator it = addresses_data.begin(); it != addresses_data.end(); ++it) {
 			for (auto adr : it.value())
-	    		addresses.push_back(adr);
+				//string str = adr.get<string>();
+	    		addresses.insert(adr.get<string>());
 	    }
 		
 		//cout << "address size " << addresses.size() << endl;
@@ -187,6 +189,8 @@ void call_contract(DataItem& dataItem, string contractAddress, string senderAddr
 		//cout << "constructor called" << endl;
 		tc->distributeERC20(dataItem, senderAddress, addresses);
 		//cout << "called distributeERC20" << endl;
+		
+
 	} else if ((input.size() < 10)) {
 		//cout << input << endl;
 		//cout << "No function to call" << endl;
@@ -205,9 +209,15 @@ void call_contract(DataItem& dataItem, string contractAddress, string senderAddr
 		  double amount = hexTodouble("0x" + input.substr(74,64));
 		  //cout << "amount: " << value << endl;
 		  status = tc->transfer(dataItem, senderAddress, address, amount);
+		  if (dataItem->balances.find(senderAddress) == dataItem->balances.end())  {
+		  	cout << "address not found\t" <<  contractAddress << "\t"  <<  senderAddress << dataItem->balances[senderAddress] << "\t" << amount << endl;
+		  	exit(-1);
+		  }
+		  	
 		  if (!status) {
 		  	//cout << senderAddress << endl;
-		  	cout << dataItem.balances[address] << "\t" << amount << endl;
+		  	//if (dataItem->balances.find(address) == dataItem->balances.end()) 
+		  	cout <<  contractAddress << "\t"  <<  senderAddress << "\t" << dataItem->balances[senderAddress] << "\t" << amount << endl;
 		  	//exit(-1);
 		  }
 		  cout << "transfer executed" << endl;

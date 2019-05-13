@@ -246,7 +246,7 @@ void analyze(vector<Transaction> TransactionList) {
       }
     }
   }
-  cout << "Connected components\t" << ccTransactionMap.size() << endl; 
+  //cout << "Connected components\t" << ccTransactionMap.size() << endl; 
 }
 
 /*
@@ -283,14 +283,45 @@ void *connectWorker (void *threadarg) {
 
   //std::vector<string> contractsList;
 
+  
+  map<string,double> bal;
+  map<string,map<string,double>> allow;
+  map<int64_t, int64_t> vote;
   map<string,DataItem> localDataItemMap;
   for (auto& tx: sendTransactionMap[worker->workerID]) {
     // add code to get the current state of contract
+    
+    /*
+    localDataItemMap[tx.fromAddress].value = dataItemMap[tx.fromAddress].value;
+    localDataItemMap[tx.fromAddress].owner = "";
+    localDataItemMap[tx.fromAddress].balances = bal;
+    localDataItemMap[tx.fromAddress].votes = vote;
+    localDataItemMap[tx.fromAddress].allowed = allow;
+    
+    localDataItemMap[tx.toAddress].value = dataItemMap[tx.toAddress].value;
+    localDataItemMap[tx.toAddress].owner = "";
+    localDataItemMap[tx.toAddress].balances = bal;
+    localDataItemMap[tx.toAddress].votes = vote;
+    localDataItemMap[tx.toAddress].allowed = allow;
+
+    localDataItemMap[tx.creates].value = dataItemMap[tx.creates].value;
+    localDataItemMap[tx.creates].owner = "";
+    localDataItemMap[tx.creates].balances = bal;
+    localDataItemMap[tx.creates].votes = vote;
+    localDataItemMap[tx.creates].allowed = allow;
+    */
+
+
     localDataItemMap[tx.fromAddress] = dataItemMap[tx.fromAddress];
-    //localDataItemMap[tx.toAddress] = dataItemMap[tx.toAddress];
+    localDataItemMap[tx.toAddress] = dataItemMap[tx.toAddress];
     //localDataItemMap[tx.creates] = dataItemMap[tx.creates];
+
+    //cout << "nsc txn at master " << dataItemMap[tx.fromAddress].value << "\t" << tx.value << endl;
+
   }
   //cout << localDataItemMap.size() << endl;
+
+
 
   Logger::instance().log(MSG+" Block "+to_string(worker->number) +" localDataItemMap generation for worker "+to_string(worker->workerID)+" ends", Logger::kLogLevelInfo);
   
@@ -302,13 +333,37 @@ void *connectWorker (void *threadarg) {
   cout << worker->threadID << ":" << sendTransactionMap[worker->workerID].size() << ":" << localWorkerResponse.dataItemMap.size() << "\n";
   Logger::instance().log(MSG+" Block "+to_string(worker->number) +" WorkerID "+to_string(worker->workerID)+" recvTransactions() ends", Logger::kLogLevelInfo);
   
-  map<string,DataItem>::iterator it;
-  for (it = localWorkerResponse.dataItemMap.begin(); it != localWorkerResponse.dataItemMap.end(); ++it)
+
+  /*
+
+  struct DataItem {
+  //1: required string address;
+  double value;
+  string owner;
+  map<string,double> balances;
+  map<string,map<string,double>> allowed;
+  map<int64_t, int64_t> votes;
+  //map<string,allowedMap> file1; // allowed map file <filename, allowedMap struct>
+  //map<string,balanceMap> file2; // balance map file <filename, balanceMap struct>
+  //map<string,string> file3; // owner file <filename, owner name>
+};
+
+  */
+  //cout << "size " << localWorkerResponse.dataItemMap.size() << endl;
+  for (auto it :localWorkerResponse.dataItemMap)
   {
-    //cout << "address " << it->first << endl;
-    dataItemMap[it->first] = it->second;
-    //dataItemMap[it->first].owner = it->second.owner;
-    //dataItemMap[it->first].balances = it->second.balances;
+    //cout << it.second.balances.size() << "\t" << it.second.allowed.size() << endl;
+
+    dataItemMap[it.first] = it.second;
+    //dataItemMap[it.first].value = it.second.value;
+    //dataItemMap[it.first].owner = it.second.owner;
+    //dataItemMap[it.first].balances = it.second.balances;
+    //dataItemMap[it.first].allowed = it.second.allowed;
+    //dataItemMap[it.first].votes = it.second.votes;
+
+    //cout << "owner " << dataItemMap[it.first].owner << endl;
+
+    
   }
 
   transport->close();
@@ -349,8 +404,11 @@ class MasterServiceHandler : virtual public MasterServiceIf {
     cout << "accounts size " << accounts.size() << endl;
     // iterate the array
     for (json::iterator it = accounts.begin(); it != accounts.end(); ++it) {
-      dataItemMap[it.key()].value = it.value();
+      if (it.value().get<double>() != 0)
+        dataItemMap[it.key()].value =  it.value().get<double>();
     }
+    cout << "optimized accounts size " << dataItemMap.size() << endl;
+    
     Logger::instance().log(MSG+" Initializing accounts with 100000000000000000000000 wei to execute transactions ends", Logger::kLogLevelInfo);
     
     std::ifstream ethereum_data_file(filename);
@@ -364,25 +422,39 @@ class MasterServiceHandler : virtual public MasterServiceIf {
 
   void processBlocks() {
     // open a file in write mode.
-    
+    ofstream e2efile;
+    e2efile.open(dir_path+"be_e2e.csv",std::ofstream::out | std::ofstream::trunc);
+      
+    ofstream txnfile;
+    txnfile.open(dir_path+"be_txn.csv",std::ofstream::out | std::ofstream::trunc);
+      
+
     // Your implementation goes here
     int64_t index = 0;
     for (json::iterator data = ethereum_data.begin(); data != ethereum_data.end(); ++data) {
-
+      
+      //
+      /**
+      ofstream prevState;
+      if (NUM_WORKERS == 1)
+        prevState.open("state/"+to_string(NUM_WORKERS)+"_worker/block_"+to_string(block.number)+"_prev_state.csv",std::ofstream::out | std::ofstream::trunc);
+      else 
+        prevState.open("state/"+to_string(NUM_WORKERS)+"_workers/block_"+to_string(block.number)+"_prev_state.csv",std::ofstream::out | std::ofstream::trunc);
+      prevState.close();
+      */
       auto start = chrono::steady_clock::now();
       block.number = index++;
       createBlock(data);
-      //if (block.number >= 200) break;
+      
+
+      //if (block.number >= 5) break;
       cout << block.number << "\t" << block.transactionsList.size() << "\n";
 
-      ofstream e2efile;
-      e2efile.open(dir_path+"be_e2e.csv",std::ofstream::out | std::ofstream::app);
       
       // miner status set to false for each block
       // it is to stop mining once solution is found
       minerStatus = false;
       double uncle_reward = 0;
-
 
       if (block.transactionsList.size() > 0) {
         Logger::instance().log(MSG+" Block "+to_string(block.number)+" analyze starts", Logger::kLogLevelInfo);
@@ -429,16 +501,68 @@ class MasterServiceHandler : virtual public MasterServiceIf {
           Logger::instance().log(MSG+" Block "+to_string(block.number)+" thread " + to_string(td[thID].threadID) +" ends", Logger::kLogLevelInfo);
         }                                                                                                                                                                           
       }
-      
+      auto end3 = chrono::steady_clock::now();
+      txnfile << chrono::duration_cast<chrono::microseconds>(end3 - start).count() << "\n";
+      //txnfile.close();
       Logger::instance().log(MSG+" Block "+to_string(block.number)+" clear_memory starts", Logger::kLogLevelInfo);
       clear_memory(); 
       Logger::instance().log(MSG+" Block "+to_string(block.number)+" clear_memory ends", Logger::kLogLevelInfo);
 
       auto end4 = chrono::steady_clock::now();
       e2efile << chrono::duration_cast<chrono::microseconds>(end4 - start).count() << "\n";
-      e2efile.close();  
+      //e2efile.close(); 
+
+      /*
+      struct DataItem {
+  //1: required string address;
+  1: required double value;
+  2: required string owner;
+  3: required map<string,double> balances;
+  4: required map<string,map<string,double>> allowed;
+  5: required map<i64,i64> votes;
+  6: required list<Transaction> transactions;
+  7: required map<string,PlayerRoll> playerRolls;
+  //2: optional map<string,allowedMap> file1; // allowed map file <filename, allowedMap struct>
+  //3: optional map<string,balanceMap> file2; // balance map file <filename, balanceMap struct>
+  //4: optional map<string,string> file3; // owner file <filename, owner name>
+}
+      */
+
+      ofstream nextState;
+      if (NUM_WORKERS == 1)
+        nextState.open("state/"+to_string(NUM_WORKERS)+"_worker/block_"+to_string(block.number)+"_next_state.csv",std::ofstream::out | std::ofstream::trunc);
+      else 
+        nextState.open("state/"+to_string(NUM_WORKERS)+"_workers/block_"+to_string(block.number)+"_next_state.csv",std::ofstream::out | std::ofstream::trunc);
+      for (auto it : dataItemMap)
+      {
+        nextState << it.first << "," << it.second.value << "," << it.second.owner << ","; 
+        for (auto b: it.second.balances) {
+          nextState << b.first << "," << b.second << ",";
+        }
+        for (auto a: it.second.allowed) {
+          nextState << a.first << ","; //<< b.second << ",";
+          for (auto c: a.second) {
+            nextState << c.first << "," << c.second << ",";
+          }
+        }
+        for (auto v: it.second.votes) {
+          nextState << v.first << "," << v.second << ",";
+        }
+        for (auto tx: it.second.transactions) {
+          nextState << tx << ","; //<< v.second << ",";
+        }
+        for (auto p: it.second.playerRolls) {
+          nextState << p.first << "," << p.second << ",";
+        }
+        nextState << endl;
+      }
+      nextState.close();
+      
+
     }
     
+    txnfile.close();
+    e2efile.close();
       
   }
 

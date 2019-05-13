@@ -19,4 +19,4 @@ struct DataItem {
 
 
 /* Your function statement here */
-void call_contract(DataItem& dataItem, string contractAddress, string senderAddress, string input, double value);
+void call_contract(DataItem* dataItem, string contractAddress, string senderAddress, string input, double value);

@@ -15,7 +15,7 @@ port = 8090
 
 
 
-for i in [1]:
+for i in [1,2,4,8,16]:
 	print "Updating data path"
 	data_path = "{}{}.json".format(path,i)
 	print data_path
@@ -26,13 +26,13 @@ for i in [1]:
 
 	print "Running for differnt worker configurations"
 
-	for j in [0,2,3,5]:
+	for j in [0,1,2,3,4,5]:
 		print
 		processes = []
 		if j == 0:
 			print "serial experiment"
 			commands = [
-				"rm -rf {}serial/".format(dir_path),
+				#"rm -rf {}serial/".format(dir_path),
 				"mkdir -p {}serial/".format(dir_path),
 				"./serial-contract {} {}serial/ ".format(data_path, dir_path)
 			]
@@ -40,7 +40,7 @@ for i in [1]:
 		elif j == 1:
 			print "{} worker experiment".format(j)
 			commands = [
-				"rm -rf {}{}_worker/".format(dir_path,j),
+				#"rm -rf {}{}_worker/".format(dir_path,j),
 				"mkdir -p {}{}_worker/".format(dir_path,j),
 				"./masterServer {} {} {} {}{}_worker/ &".format(port, j, data_path, dir_path,j),
 				"./workerServer {} {} {}{}_worker/ &".format(port+j,j, dir_path,j)
@@ -52,7 +52,7 @@ for i in [1]:
 			print "{} workers experiment".format(j)
 
 			commands = [
-				"rm -rf {}{}_workers/".format(dir_path,j),
+				#"rm -rf {}{}_workers/".format(dir_path,j),
 				"mkdir -p {}{}_workers/".format(dir_path,j),
 				"./masterServer {} {} {} {}{}_workers/ &".format(port, j, data_path, dir_path,j),
 			]

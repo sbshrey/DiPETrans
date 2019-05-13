@@ -100,8 +100,11 @@ void genesis() {
 	cout << "accounts size " << accounts.size() << endl;
 	// iterate the array
 	for (json::iterator it = accounts.begin(); it != accounts.end(); ++it) {
-		dataItemMap[it.key()].value = it.value();
+		if (it.value().get<double>() != 0)
+			dataItemMap[it.key()].value = it.value().get<double>();
 	}
+	cout << "optimized accounts size " << dataItemMap.size() << endl;
+    
 }
 
 /*
@@ -167,26 +170,48 @@ int main(int argc, char const *argv[])
   	int64_t failed_transactions = 0;
 
   	ofstream nttfile;
-    nttfile.open(dir_path+"be_ntt.csv",std::ofstream::out | std::ofstream::app);
+    nttfile.open(dir_path+"be_ntt.csv",std::ofstream::out | std::ofstream::trunc);
     ofstream cttfile;
-    cttfile.open(dir_path+"be_ctt.csv",std::ofstream::out | std::ofstream::app);
+    cttfile.open(dir_path+"be_ctt.csv",std::ofstream::out | std::ofstream::trunc);
 
     ofstream e2efile;
-    e2efile.open(dir_path+"be_e2e.csv",std::ofstream::out | std::ofstream::app);
+    e2efile.open(dir_path+"be_e2e.csv",std::ofstream::out | std::ofstream::trunc);
 
-    ofstream scfile;
-    scfile.open(dir_path+"sc_call.csv",std::ofstream::out | std::ofstream::app);
+    ofstream txnfile;
+    txnfile.open(dir_path+"be_txn.csv",std::ofstream::out | std::ofstream::trunc);
+
+    //ofstream scfile;
+    //scfile.open(dir_path+"sc_call.csv",std::ofstream::out | std::ofstream::app);
 
     int64_t index = 0;
 
   	for (json::iterator data = ethereum_data.begin(); data != ethereum_data.end(); ++data){
+  		
+  		//block.number = index++;
+
+	    /*
+	    ofstream prevState;
+      	prevState.open("state/serial/block_"+to_string(block.number)+"_prev_state.csv",std::ofstream::out | std::ofstream::trunc);
+      	for (auto it : dataItemMap)
+		{
+			for (auto b: it.second.balances) {
+	          cout << b.first << ":" << b.second << endl;
+	        }
+			prevState << it.first << "," << it.second << endl; 
+		}
+      	prevState.close();
+		*/
+
   		auto start = chrono::steady_clock::now();
+
+  		block.number = index++;
   		//cout << typeid(data).name() << endl;
   		//cout << (*data)["transactions"].size() << "\t";// << data.value()["transactions"].size() << endl;
   		//break;
 	    createBlock(data);
-	    block.number = index++;
-	    //if (block.number >= 100) break;
+	    
+	    
+	    //if (block.number >= 5) break;
 	    
 	    cout << block.number << "\t" << block.transactionsList.size() << endl;
 
@@ -207,10 +232,10 @@ int main(int argc, char const *argv[])
 
 
 				bool status= false;
-				if (tx.creates != "") {
+				if (tx.toAddress == "creates") {
 					contract_addresses.push_back(tx.creates);
 					DataItem localDataItem;
-        			call_contract(localDataItem, tx.creates, tx.fromAddress, tx.toAddress, tx.value);
+        			call_contract(&localDataItem, tx.creates, tx.fromAddress, tx.toAddress, tx.value);
         			dataItemMap[tx.creates] =  localDataItem;
         			txn_end = chrono::steady_clock::now();
 					contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
@@ -220,7 +245,7 @@ int main(int argc, char const *argv[])
 			        std::vector<string>::iterator it = std::find (contract_addresses.begin(), contract_addresses.end(), tx.toAddress); 
 			        if (it != contract_addresses.end()) {  
 			          DataItem localDataItem = dataItemMap[tx.toAddress];
-			          call_contract(localDataItem, tx.toAddress, tx.fromAddress, tx.input, tx.value);
+			          call_contract(&localDataItem, tx.toAddress, tx.fromAddress, tx.input, tx.value);
 			          dataItemMap[tx.toAddress] =  localDataItem;
 			          txn_end = chrono::steady_clock::now();
 			          contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
@@ -231,7 +256,7 @@ int main(int argc, char const *argv[])
 			        it = std::find (contract_addresses.begin(), contract_addresses.end(), tx.fromAddress); 
 			        if (it != contract_addresses.end() and !flag) {  
 			          DataItem localDataItem = dataItemMap[tx.fromAddress];
-			          call_contract(localDataItem, tx.fromAddress, tx.toAddress, tx.input, tx.value);
+			          call_contract(&localDataItem, tx.fromAddress, tx.toAddress, tx.input, tx.value);
 			          dataItemMap[tx.fromAddress] = localDataItem;
 			          txn_end = chrono::steady_clock::now();
 			          contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
@@ -241,10 +266,11 @@ int main(int argc, char const *argv[])
 
 			        if (!flag) {
 			          if (dataItemMap[tx.fromAddress].value >= double(tx.value)) {
-			            dataItemMap[tx.fromAddress].value -=  (double(tx.value) - fee);
+			            dataItemMap[tx.fromAddress].value -=  (double(tx.value));
 			            dataItemMap[tx.toAddress].value += double(tx.value);
 			            status = true;  
 			          } else {
+			          	cout << "nsc txn " << dataItemMap[tx.fromAddress].value << "\t" << tx.value << endl;
 			            status = false;
 			          }
 			          txn_end = chrono::steady_clock::now();
@@ -269,6 +295,9 @@ int main(int argc, char const *argv[])
 				nttfile << normal_txn_time << endl;
 		}
 
+		auto end3 = chrono::steady_clock::now();
+      	txnfile << chrono::duration_cast<chrono::microseconds>(end3 - start).count() << "\n";
+
 		//cout << "success: " << successful_transactions << endl;
 		//cout << "failed " << failed_transactions << endl;
     	//Logger::instance().log("Block " + data.key() + " Block Execution ends", Logger::kLogLevelInfo);
@@ -280,11 +309,39 @@ int main(int argc, char const *argv[])
 		auto end4 = chrono::steady_clock::now();
 		e2efile << chrono::duration_cast<chrono::microseconds>(end4 - start).count() << "\n";
 
+		ofstream nextState;
+		nextState.open("state/serial/block_"+to_string(block.number)+"_next_state.csv",std::ofstream::out | std::ofstream::trunc);
+		for (auto it : dataItemMap)
+		{
+			nextState << it.first << "," << it.second.value << "," << it.second.owner << ","; 
+			for (auto b: it.second.balances) {
+			  nextState << b.first << "," << b.second << ",";
+			}
+			for (auto a: it.second.allowed) {
+			  nextState << a.first << ","; //<< b.second << ",";
+			  for (auto c: a.second) {
+			    nextState << c.first << "," << c.second << ",";
+			  }
+			}
+			for (auto v: it.second.votes) {
+			  nextState << v.first << "," << v.second << ",";
+			}
+			for (auto tx: it.second.transactions) {
+			  nextState << tx << ","; //<< v.second << ",";
+			}
+			for (auto p: it.second.playerRolls) {
+			  nextState << p.first << "," << p.second << ",";
+			}
+			nextState <<endl;
+		}
+		nextState.close();
+
+
 	}
 	nttfile.close();
 	cttfile.close();
 	e2efile.close();
-	scfile.close();
+	//scfile.close();
 
 	Logger::instance().log("Serial Execution ends", Logger::kLogLevelInfo);
 	

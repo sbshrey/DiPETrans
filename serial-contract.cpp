@@ -309,32 +309,35 @@ int main(int argc, char const *argv[])
 		auto end4 = chrono::steady_clock::now();
 		e2efile << chrono::duration_cast<chrono::microseconds>(end4 - start).count() << "\n";
 
-		ofstream nextState;
-		nextState.open("state/serial/block_"+to_string(block.number)+"_next_state.csv",std::ofstream::out | std::ofstream::trunc);
-		for (auto it : dataItemMap)
-		{
-			nextState << it.first << "," << it.second.value << "," << it.second.owner << ","; 
-			for (auto b: it.second.balances) {
-			  nextState << b.first << "," << b.second << ",";
+		if (block.number % 100 == 0) {
+			ofstream nextState;
+			nextState.open("state/serial/block_"+to_string(block.number)+"_next_state.csv",std::ofstream::out | std::ofstream::trunc);
+			for (auto it : dataItemMap)
+			{
+				nextState << it.first << "," << it.second.value << "," << it.second.owner << ","; 
+				for (auto b: it.second.balances) {
+				  nextState << b.first << "," << b.second << ",";
+				}
+				for (auto a: it.second.allowed) {
+				  nextState << a.first << ","; //<< b.second << ",";
+				  for (auto c: a.second) {
+				    nextState << c.first << "," << c.second << ",";
+				  }
+				}
+				for (auto v: it.second.votes) {
+				  nextState << v.first << "," << v.second << ",";
+				}
+				for (auto tx: it.second.transactions) {
+				  nextState << tx << ","; //<< v.second << ",";
+				}
+				for (auto p: it.second.playerRolls) {
+				  nextState << p.first << "," << p.second << ",";
+				}
+				nextState <<endl;
 			}
-			for (auto a: it.second.allowed) {
-			  nextState << a.first << ","; //<< b.second << ",";
-			  for (auto c: a.second) {
-			    nextState << c.first << "," << c.second << ",";
-			  }
-			}
-			for (auto v: it.second.votes) {
-			  nextState << v.first << "," << v.second << ",";
-			}
-			for (auto tx: it.second.transactions) {
-			  nextState << tx << ","; //<< v.second << ",";
-			}
-			for (auto p: it.second.playerRolls) {
-			  nextState << p.first << "," << p.second << ",";
-			}
-			nextState <<endl;
+			nextState.close();
 		}
-		nextState.close();
+		
 
 
 	}

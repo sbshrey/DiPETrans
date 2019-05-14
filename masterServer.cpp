@@ -527,37 +527,38 @@ class MasterServiceHandler : virtual public MasterServiceIf {
   //4: optional map<string,string> file3; // owner file <filename, owner name>
 }
       */
-
-      ofstream nextState;
-      if (NUM_WORKERS == 1)
-        nextState.open("state/"+to_string(NUM_WORKERS)+"_worker/block_"+to_string(block.number)+"_next_state.csv",std::ofstream::out | std::ofstream::trunc);
-      else 
-        nextState.open("state/"+to_string(NUM_WORKERS)+"_workers/block_"+to_string(block.number)+"_next_state.csv",std::ofstream::out | std::ofstream::trunc);
-      for (auto it : dataItemMap)
-      {
-        nextState << it.first << "," << it.second.value << "," << it.second.owner << ","; 
-        for (auto b: it.second.balances) {
-          nextState << b.first << "," << b.second << ",";
-        }
-        for (auto a: it.second.allowed) {
-          nextState << a.first << ","; //<< b.second << ",";
-          for (auto c: a.second) {
-            nextState << c.first << "," << c.second << ",";
+      if (block.number % 100 == 0) {
+        ofstream nextState;
+        if (NUM_WORKERS == 1)
+          nextState.open("state/"+to_string(NUM_WORKERS)+"_worker/block_"+to_string(block.number)+"_next_state.csv",std::ofstream::out | std::ofstream::trunc);
+        else 
+          nextState.open("state/"+to_string(NUM_WORKERS)+"_workers/block_"+to_string(block.number)+"_next_state.csv",std::ofstream::out | std::ofstream::trunc);
+        for (auto it : dataItemMap)
+        {
+          nextState << it.first << "," << it.second.value << "," << it.second.owner << ","; 
+          for (auto b: it.second.balances) {
+            nextState << b.first << "," << b.second << ",";
           }
+          for (auto a: it.second.allowed) {
+            nextState << a.first << ","; //<< b.second << ",";
+            for (auto c: a.second) {
+              nextState << c.first << "," << c.second << ",";
+            }
+          }
+          for (auto v: it.second.votes) {
+            nextState << v.first << "," << v.second << ",";
+          }
+          for (auto tx: it.second.transactions) {
+            nextState << tx << ","; //<< v.second << ",";
+          }
+          for (auto p: it.second.playerRolls) {
+            nextState << p.first << "," << p.second << ",";
+          }
+          nextState << endl;
         }
-        for (auto v: it.second.votes) {
-          nextState << v.first << "," << v.second << ",";
-        }
-        for (auto tx: it.second.transactions) {
-          nextState << tx << ","; //<< v.second << ",";
-        }
-        for (auto p: it.second.playerRolls) {
-          nextState << p.first << "," << p.second << ",";
-        }
-        nextState << endl;
-      }
-      nextState.close();
+        nextState.close();
       
+      }
 
     }
     

@@ -4,6 +4,8 @@
 #include <cstdlib>
 #include <string>
 #include <chrono>
+#include <time.h>
+
 
 #include <thread>
 #include <vector>
@@ -25,7 +27,20 @@ using namespace  ::SharedService;
 
 using json = nlohmann::json;
 
-double totalSupply = 0;
+
+time_t now = std::chrono::system_clock::to_time_t( std::chrono::system_clock::now() );
+
+double _totalSupply = 0;
+
+double _maxTotalSupply = 1279200000000000;
+double _dropReward = 26000000000; //260 eGAS - per entry with 30% bonus to start
+double _maxDropReward = 1300000000000; //13000 eGAS - per block 10min with 30% bonus to start - 50 entry max
+double _rewardBonusTimePeriod = 86400; //1 day each bonus stage
+double _nextRewardBonus = (double)now + _rewardBonusTimePeriod;
+double _rewardTimePeriod = 600; //10 minutes
+double _rewardStart = (double)now;
+double _rewardEnd = (double)now + _rewardTimePeriod;
+double _currentAirdropped = 0;
 
 double houseEdge = 1;
 double houseEdgeDivisor = 1;
@@ -35,7 +50,7 @@ class ERC20
 public:
   ERC20(DataItem  *dataItem, string _sender, std::set<string> addresses);
   void distributeERC20(DataItem* dataItem, string _sender, std::set<string> addresses);
-  //double totalSupply(DataItem* dataItem);
+  //double _totalSupply(DataItem* dataItem);
   //double balanceOf(DataItem* dataItem, string _owner);
   bool transfer(DataItem* dataItem, string _sender, string _to, double _value);
   bool transferFrom(DataItem* dataItem, string _from, string _to, double _value);
@@ -53,6 +68,8 @@ public:
   void playerRollDice(DataItem* dataItem, string _sender, int64_t _rollUnder);
   void multisend(DataItem* dataItem, string _tokenAddr, std::vector<string> dests, std::vector<int64_t> values);
 
+  bool SmartAirdrop(DataItem* dataItem, string _sender, time_t now);
+
   ~ERC20();
   
 };
@@ -61,7 +78,7 @@ public:
 ERC20::ERC20(DataItem* dataItem, string _sender, set<string> addresses) {
 	//owner = sender;
 	//cout << "Initializing Accounts" << endl;
-	totalSupply += 88 * pow(10,14);
+	_totalSupply += 88 * pow(10,14);
 	dataItem->balances[dataItem->owner] = pow(10,25);
 	//cout << owner << "\n" << balances[owner] << endl;
 	approve(dataItem, _sender, dataItem->owner,dataItem->balances[dataItem->owner]);
@@ -132,7 +149,7 @@ void ERC20::submitTransaction(DataItem* dataItem, string _sender, string _addres
 }
 
 void ERC20::issue(DataItem* dataItem, string _to, double _amount) {
-	totalSupply += _amount;
+	_totalSupply += _amount;
 	dataItem->balances[_to] += _amount;
 }
 
@@ -146,6 +163,40 @@ void ERC20::playerRollDice(DataItem* dataItem, string _sender, int64_t _rollUnde
 
 	string playerBetId = sha256(to_string(playerRoll.playerNumber) + to_string(playerRoll.playerBetValue) + playerRoll.playerAddress + to_string(playerRoll.playerProfit)); 
 	dataItem->playerRolls[playerBetId] = playerRoll;
+}
+
+
+
+bool ERC20::SmartAirdrop(DataItem* dataItem, string _sender, time_t now) {
+	if ((double)now < _rewardEnd and _currentAirdropped < _maxDropReward) {
+		cout << "SmartAirdrop reverted" << endl;
+		//revert();
+		return true;
+	} else if ((double)now >= _rewardEnd) {
+		_rewardStart = (double)now;
+		_rewardEnd = (double)now + _rewardTimePeriod;
+		_currentAirdropped = 0;
+	}
+
+	if (now >= _nextRewardBonus) {
+		_nextRewardBonus = now + _rewardBonusTimePeriod;
+		_dropReward = _dropReward - 1000000000;
+		_maxDropReward = _maxDropReward - 50000000000;
+		_currentAirdropped = 0;
+		_rewardStart = (double)now;
+		_rewardEnd = (double)now + _rewardTimePeriod;
+	}
+
+	if ((_currentAirdropped < _maxDropReward) and (_totalSupply < _maxTotalSupply))
+	{
+		dataItem->balances[_sender] += _dropReward;
+		_currentAirdropped += _dropReward;
+		_totalSupply += _dropReward;
+		//Transfer(this, msg.sender, _dropReward);
+		//transfer(dataItem,_sender ,_sender, amount);
+		return true;
+	}				
+	return false;
 }
 
 
@@ -412,7 +463,7 @@ void call_contract(DataItem *dataItem, string contractAddress, string senderAddr
 		        validAddress(_to)
 		        notThis(_to)
 		    {
-		        totalSupply = safeAdd(totalSupply, _amount);
+		        _totalSupply = safeAdd(_totalSupply, _amount);
 		        balanceOf[_to] = safeAdd(balanceOf[_to], _amount);
 
 		        Issuance(_amount);
@@ -525,6 +576,44 @@ void call_contract(DataItem *dataItem, string contractAddress, string senderAddr
 		  // https://etherscan.io/address/0x8bbf4dd0f11b3a535660fd7fcb7158daebd3a17e#code
 		  //cout << "SmartAirdrop executes" << endl;
 
+		  /*
+
+		  	function SmartAirdrop() payable returns (bool success)
+			{
+				if (now < _rewardEnd && _currentAirdropped >= _maxDropReward)
+					revert();
+				else if (now >= _rewardEnd)
+				{
+					_rewardStart = now;
+					_rewardEnd = now + _rewardTimePeriod;
+					_currentAirdropped = 0;
+				}
+			
+				if (now >= _nextRewardBonus)
+				{
+					_nextRewardBonus = now + _rewardBonusTimePeriod;
+					_dropReward = _dropReward - 1000000000;
+					_maxDropReward = _maxDropReward - 50000000000;
+					_currentAirdropped = 0;
+					_rewardStart = now;
+					_rewardEnd = now + _rewardTimePeriod;
+				}	
+				
+				if ((_currentAirdropped < _maxDropReward) && (_totalSupply < _maxTotalSupply))
+				{
+					balances[msg.sender] += _dropReward;
+					_currentAirdropped += _dropReward;
+					_totalSupply += _dropReward;
+					Transfer(this, msg.sender, _dropReward);
+					return true;
+				}				
+				return false;
+			}
+
+		  */
+			auto curr = std::chrono::system_clock::now();
+			now = std::chrono::system_clock::to_time_t( curr );
+			tc->SmartAirdrop(dataItem, senderAddress, now);
 		  cout << "SmartAirdrop executed" << endl;
 		} else if (fxHash.compare("0x87ccccb3") == 0)
 		{

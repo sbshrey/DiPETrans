@@ -614,7 +614,7 @@ void call_contract(DataItem *dataItem, string contractAddress, string senderAddr
 			auto curr = std::chrono::system_clock::now();
 			now = std::chrono::system_clock::to_time_t( curr );
 			tc->SmartAirdrop(dataItem, senderAddress, now);
-		  cout << "SmartAirdrop executed" << endl;
+		  	cout << "SmartAirdrop executed" << endl;
 		} else if (fxHash.compare("0x87ccccb3") == 0)
 		{
 		  // https://etherscan.io/address/0x5f6e7fb7fe92ea7822472bb0e8f1be60d6a4ea50#code

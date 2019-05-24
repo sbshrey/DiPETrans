@@ -47,10 +47,27 @@ string MSG="WorkerServer";
 int masterPort = 8090;
 string masterIP = "localhost";
 
+
+string convert_block_to_string(Block block) {
+  stringstream ss;
+  ss << to_string(block.number) << block.prevHash << to_string(block.nonce);
+  for (auto& tx : block.transactionsList) {
+    ss << to_string(tx.transactionID);
+    ss << tx.toAddress;
+    ss << tx.fromAddress;
+    ss << to_string(tx.value);
+    ss << tx.input;
+    ss << tx.creates;
+    //str.append(to_string(tx.gas));
+    //str.append(to_string(tx.gasPrice));
+  }
+  return ss.str();
+}
+
 Block createBlock(Block b) {
     Block block;
     block.number = b.number; //stoi(data.key());//atoi(d.key().c_str());
-    
+    block.prevHash = b.prevHash;
     for (auto& tx: b.transactionsList) {
       Transaction transaction;
       transaction.transactionID = tx.transactionID;
@@ -70,30 +87,6 @@ Block createBlock(Block b) {
 string difficulty = "00011111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111";
 
 
-string convert_block_to_string(Block block) {
-  string str = "";
-  //str.append(block.timestamp);
-  str.append(to_string(block.nonce));
-  str.append(block.prevHash);
-  str.append(to_string(block.number));
-  str.append(block.miner);
-
-  for (auto& tx : block.transactionsList) {
-    str.append(to_string(tx.transactionID));
-    str.append(tx.toAddress);
-    str.append(tx.fromAddress);
-    str.append(to_string(tx.value));
-    str.append(tx.input);
-    str.append(tx.creates);
-  }
-
-  for (auto& u : block.unclesList) {
-    str.append(u.miner);
-    str.append(to_string(u.number));
-  }
-
-  return str;
-}
 
 /*
 bool execute (Transaction transaction, int status) {
@@ -291,9 +284,10 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
     auto end = chrono::steady_clock::now();
   }
 
-  void mineBlock(const  ::MasterService::Block& block, const int16_t nonce, const int16_t interval) {
+  void mineBlock(const  ::MasterService::Block& block, const int64_t nonce, const int16_t interval) {
     // Your implementation goes here
     //block.nonce = nonce;
+    //cout << "worker mining " << endl;
     Block newBlock = createBlock(block);
 
     newBlock.nonce = nonce;

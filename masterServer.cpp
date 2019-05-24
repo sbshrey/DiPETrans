@@ -50,6 +50,8 @@
 #include <sstream>
 #include <iomanip>
 
+#include "utils.h"
+
 //#define NUM_WORKERS 5
 //#define NUM_THREADS 5
 //#define NUM_ACCOUNTS 50
@@ -77,9 +79,9 @@ bool minerStatus = false;
 string filename;
 string dir_path;
 string block_hash = "0000000000000000000000000000000000000000000000000000000000000000";
-string difficulty = "00111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111";
+string difficulty = "00011111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111";
 
-
+bool mining = false;
 
 vector<WorkerNode> WorkerList;
 
@@ -121,6 +123,22 @@ struct thread_data {
 map<int16_t,vector<Transaction>> sendTransactionMap;
 map<int16_t, set<int16_t>> ccTransactionMap;
 
+
+string convert_block_to_string(Block block) {
+  stringstream ss;
+  ss << to_string(block.number) << block.prevHash << to_string(block.nonce);
+  for (auto& tx : block.transactionsList) {
+    ss << to_string(tx.transactionID);
+    ss << tx.toAddress;
+    ss << tx.fromAddress;
+    ss << tx.value;
+    ss << tx.input;
+    ss << tx.creates;
+    //str.append(to_string(tx.gas));
+    //str.append(to_string(tx.gasPrice));
+  }
+  return ss.str();
+}
 
 
 void createBlock(json::iterator data) {
@@ -381,11 +399,11 @@ class MasterServiceHandler : virtual public MasterServiceIf {
   MasterServiceHandler() {
     // Your initialization goes here
     
-    int port = 8091;
+    int16_t port = 8091;
     string ip = "localhost";
     //string ip = "10.24.50.57";
 
-    for (int id=1; id<=NUM_WORKERS; id++) {
+    for (int16_t id=1; id<=NUM_WORKERS; id++) {
       WorkerNode workerNode;
       workerNode.workerID = id;
       workerNode.workerIP = ip;
@@ -423,11 +441,13 @@ class MasterServiceHandler : virtual public MasterServiceIf {
   void processBlocks() {
     // open a file in write mode.
     ofstream e2efile;
-    e2efile.open(dir_path+"be_e2e.csv",std::ofstream::out | std::ofstream::trunc);
+    e2efile.open(dir_path+"be_e2e_milli.csv",std::ofstream::out | std::ofstream::trunc);
       
     ofstream txnfile;
-    txnfile.open(dir_path+"be_txn.csv",std::ofstream::out | std::ofstream::trunc);
-      
+    txnfile.open(dir_path+"be_txn_milli.csv",std::ofstream::out | std::ofstream::trunc);
+    
+    ofstream minefile;
+    minefile.open(dir_path+"be_mine_milli.csv",std::ofstream::out | std::ofstream::trunc);  
 
     // Your implementation goes here
     int64_t index = 0;
@@ -444,6 +464,8 @@ class MasterServiceHandler : virtual public MasterServiceIf {
       */
       auto start = chrono::steady_clock::now();
       block.number = index++;
+      if (block.number > 100 and mining) break;
+
       createBlock(data);
       
 
@@ -501,15 +523,67 @@ class MasterServiceHandler : virtual public MasterServiceIf {
           Logger::instance().log(MSG+" Block "+to_string(block.number)+" thread " + to_string(td[thID].threadID) +" ends", Logger::kLogLevelInfo);
         }                                                                                                                                                                           
       }
-      auto end3 = chrono::steady_clock::now();
-      txnfile << chrono::duration_cast<chrono::microseconds>(end3 - start).count() << "\n";
+
+      auto end2 = chrono::steady_clock::now();
+      txnfile << chrono::duration_cast<chrono::milliseconds>(end2 - start).count() << "\n";
       //txnfile.close();
+
+      Block prevBlock;
+      // Mining starts
+      if (mining) {
+        Logger::instance().log(MSG+" Block " + to_string(block.number) + " Block Mining starts", Logger::kLogLevelInfo);
+        minerStatus = false;
+        //string block_hash = "0000000000000000000000000000000000000000000000000000000000000000";
+        cout << mining << endl;
+        string block_str = convert_block_to_string(prevBlock);
+        block.prevHash = sha256(block_str);
+        //cout << "prev hash calculated" << endl;
+        for (auto const& worker : WorkerList) {
+          std::shared_ptr<TTransport> socket(new TSocket(worker.workerIP, worker.workerPort));
+          std::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
+          std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
+          WorkerServiceClient workerClient(protocol);
+          //Logger::instance().log(MSG+" Block "+to_string(block.number) +" connection to worker "+to_string(worker.workerID)+" starts", Logger::kLogLevelInfo);
+          transport->open();
+          //Logger::instance().log(MSG+" Block "+to_string(block.number) +" WorkerID "+to_string(worker.workerID)+" mineBlock() starts", Logger::kLogLevelInfo);
+          //printf("Sending transactionsList and LocalDataItemsMap to worker nodes\n");
+          workerClient.mineBlock(block,worker.workerID,NUM_WORKERS); // returns local worker response
+          //Logger::instance().log(MSG+" Block "+to_string(block.number) +" WorkerID "+to_string(worker.workerID)+" mineBlock() ends", Logger::kLogLevelInfo);
+          
+          transport->close();
+          //Logger::instance().log(MSG+" Block "+to_string(block.number) +" connection to worker "+to_string(worker.workerID)+" ends", Logger::kLogLevelInfo);
+          //Logger::instance().log(MSG+" Block "+to_string(newBlock.number) +" thread "+ to_string(worker.workerID) +" ends", Logger::kLogLevelInfo);
+        }
+        //cout << "waiting starts" <<  endl;
+
+        cout << endl;
+        while (!minerStatus) {
+          cout << minerStatus;
+          //bool status = minerStatus;
+          //sleep(1);
+          std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+        cout << endl;
+        Logger::instance().log(MSG+" Block " + to_string(block.number) + " Block Mining ends", Logger::kLogLevelInfo);
+
+      }
+      
+      prevBlock = block;
+
+      auto end3 = chrono::steady_clock::now();
+      minefile << chrono::duration_cast<chrono::milliseconds>(end3 - end2).count() << "\n";
+      //txnfile.close();
+      
       Logger::instance().log(MSG+" Block "+to_string(block.number)+" clear_memory starts", Logger::kLogLevelInfo);
       clear_memory(); 
       Logger::instance().log(MSG+" Block "+to_string(block.number)+" clear_memory ends", Logger::kLogLevelInfo);
 
       auto end4 = chrono::steady_clock::now();
-      e2efile << chrono::duration_cast<chrono::microseconds>(end4 - start).count() << "\n";
+      e2efile << chrono::duration_cast<chrono::milliseconds>(end4 - start).count() << "\n";
+
+
+
+
       //e2efile.close(); 
 
       /*
@@ -576,8 +650,8 @@ class MasterServiceHandler : virtual public MasterServiceIf {
     if (block.number == number && !minerStatus) {
       block.nonce = nonce;
       
-      //string block_str = convert_block_to_string(block);
-      //block_hash = sha256(block_str);
+      string block_str = convert_block_to_string(block);
+      block_hash = sha256(block_str);
       //cout << nonce << "\t" << block_hash << endl;
 
       minerStatus = true;
@@ -597,6 +671,7 @@ int main(int argc, char **argv) {
   NUM_THREADS = atoi(argv[2]);
   filename = argv[3];
   dir_path = argv[4];
+  mining = stoi(argv[5]);
   NUM_WORKERS = NUM_THREADS;
 
   ::apache::thrift::stdcxx::shared_ptr<MasterServiceHandler> handler(new MasterServiceHandler());
@@ -606,7 +681,7 @@ int main(int argc, char **argv) {
   ::apache::thrift::stdcxx::shared_ptr<TProtocolFactory> protocolFactory(new TBinaryProtocolFactory());
   
   // using thread pool with maximum 15 threads to handle incoming requests
-  shared_ptr<ThreadManager> threadManager = ThreadManager::newSimpleThreadManager(5);
+  shared_ptr<ThreadManager> threadManager = ThreadManager::newSimpleThreadManager(10);
   shared_ptr<PosixThreadFactory> threadFactory = shared_ptr<PosixThreadFactory>(new PosixThreadFactory());
   threadManager->threadFactory(threadFactory);
   threadManager->start();

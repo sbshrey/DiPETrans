@@ -13,8 +13,8 @@ struct MasterNode {
 
 struct Block {
 	1: required i32 number;
-	2: optional i64 nonce;
-	3: optional string prevHash;
+	2: required i64 nonce;
+	3: required string prevHash;
 	4: optional string miner;
 	5: required list<SharedService.Transaction> transactionsList;
 	6: optional list<SharedService.Uncle> unclesList;

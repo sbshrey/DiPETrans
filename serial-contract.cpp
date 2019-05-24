@@ -79,9 +79,15 @@ map<string,DataItem> dataItemMap;
 std::vector<string> contract_addresses;
 
 
+string difficulty = "00011111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111";
+
 string MSG="Serial";
 
 Block block;
+
+string prevBlockHash = "0000000000000000000000000000000000000000000000000000000000000000";
+
+bool mining = false;
 
 
 // Clears memory of global data structures after every block creation
@@ -107,24 +113,63 @@ void genesis() {
     
 }
 
-/*
-bool execute (Transaction transaction) {
 
-	bool status = false;
-	string cmd = "";
-	if (transaction.toAddress == "creates") {
-		cmd = "./contract_erc20 " + transaction.creates + " " + transaction.fromAddress + " " + transaction.toAddress;
-	} else {
-		cmd = "./contract_erc20 " + transaction.toAddress + " " + transaction.fromAddress + " " + transaction.input;
-
+string convert_block_to_string(Block block) {
+	/*string str = "";
+	//str.append(block.timestamp);
+	str.append(to_string(block.nonce));
+	cout << str << endl;
+	str.append(block.prevHash);
+	cout << str << endl;
+	str.append(to_string(block.number));
+	cout << str << endl;
+	for (auto& tx : block.transactionsList) {
+		str.append(to_string(tx.transactionID));
+		str.append(tx.toAddress);
+		str.append(tx.fromAddress);
+		str.append(to_string(int64_t(tx.value)));
+		str.append(tx.input);
+		str.append(tx.creates);
+		//str.append(to_string(tx.gas));
+		//str.append(to_string(tx.gasPrice));
 	}
-	const char *command = cmd.c_str();
-	status = system(command);
-	
-	return true;
-}
-*/
+	cout << str << endl;
+	*/
 
+	stringstream ss;
+	ss << to_string(block.number) << block.prevHash << to_string(block.nonce);
+	for (auto& tx : block.transactionsList) {
+		ss << to_string(tx.transactionID);
+		ss << tx.toAddress;
+		ss << tx.fromAddress;
+		ss << tx.value;
+		ss << tx.input;
+		ss << tx.creates;
+		//str.append(to_string(tx.gas));
+		//str.append(to_string(tx.gasPrice));
+	}
+	return ss.str();
+	//str.append(block.transaction_count);
+}
+
+
+string mine(Block block) {
+	block.nonce = 0; 
+	string hash;
+	//cout << "mining " << endl;
+	while (true) {
+		string block_str = convert_block_to_string(block);
+		//cout << "block string " << block_str << endl;
+		hash = sha256(block_str); //sha256(sha256(block_str));
+		if (hash.compare(difficulty) < 0) {
+			//cout << block.nonce << "\t";
+			break;
+		}
+	    block.nonce++;
+	}
+	//cout << block.nonce << "\t";
+	return hash;
+}
 
 
 void createBlock(json::iterator data) {
@@ -133,6 +178,7 @@ void createBlock(json::iterator data) {
   
   Logger::instance().log(MSG+" Block "+to_string(block.number)+" transactionsList starts", Logger::kLogLevelInfo);
   int16_t txid=0;
+
   for (auto& tx: (*data)["transactions"]) {
     Transaction transaction;
     transaction.transactionID = txid++; //tx["txID"];
@@ -175,15 +221,21 @@ int main(int argc, char const *argv[])
     cttfile.open(dir_path+"be_ctt.csv",std::ofstream::out | std::ofstream::trunc);
 
     ofstream e2efile;
-    e2efile.open(dir_path+"be_e2e.csv",std::ofstream::out | std::ofstream::trunc);
+    e2efile.open(dir_path+"be_e2e_milli.csv",std::ofstream::out | std::ofstream::trunc);
 
     ofstream txnfile;
-    txnfile.open(dir_path+"be_txn.csv",std::ofstream::out | std::ofstream::trunc);
+    txnfile.open(dir_path+"be_txn_milli.csv",std::ofstream::out | std::ofstream::trunc);
+
+    ofstream minefile;
+    minefile.open(dir_path+"be_mine_milli.csv",std::ofstream::out | std::ofstream::trunc);
 
     //ofstream scfile;
     //scfile.open(dir_path+"sc_call.csv",std::ofstream::out | std::ofstream::app);
 
     int64_t index = 0;
+
+    mining = stoi(argv[3]);
+    cout << "Mining " << mining << endl;
 
   	for (json::iterator data = ethereum_data.begin(); data != ethereum_data.end(); ++data){
   		
@@ -205,6 +257,10 @@ int main(int argc, char const *argv[])
   		auto start = chrono::steady_clock::now();
 
   		block.number = index++;
+  		block.prevHash = prevBlockHash;
+  		block.nonce = 0;
+  		//cout << mining << endl;
+  		if (block.number > 100 and mining) break;
   		//cout << typeid(data).name() << endl;
   		//cout << (*data)["transactions"].size() << "\t";// << data.value()["transactions"].size() << endl;
   		//break;
@@ -295,19 +351,48 @@ int main(int argc, char const *argv[])
 				nttfile << normal_txn_time << endl;
 		}
 
-		auto end3 = chrono::steady_clock::now();
-      	txnfile << chrono::duration_cast<chrono::microseconds>(end3 - start).count() << "\n";
+		auto end2 = chrono::steady_clock::now();
+      	txnfile << chrono::duration_cast<chrono::milliseconds>(end2 - start).count() << "\n";
 
 		//cout << "success: " << successful_transactions << endl;
 		//cout << "failed " << failed_transactions << endl;
     	//Logger::instance().log("Block " + data.key() + " Block Execution ends", Logger::kLogLevelInfo);
+
+      	/*
+      	Logger::instance().log("Block " + to_string(block.number) + " Uncles Execution starts", Logger::kLogLevelInfo);
+		//cout << data[i_str]
+		//cout << "UnclesList"
+		for (auto& uncle: block.unclesList) {
+		int ubn = uncle.number;
+		//cout << ubn << endl;
+		DataItemsMap[uncle.miner] = DataItemsMap[uncle.miner] + ((ubn+8-block.number) * base_reward)/8;
+		uncle_reward += (base_reward/32);
+		//cout << block.number << "\t" << base_reward << endl;
+		//cout << "uncle: " << ubn << " reward:" << uncle_reward << "," << (block.number-ubn) << " ," << ((ubn+8-block.number) * base_reward)/8 << endl;
+		}
+		Logger::instance().log("Block " + to_string(block.number) + " Uncles Execution ends", Logger::kLogLevelInfo);
+    	DataItemsMap[block.miner] = DataItemsMap[block.miner] + (base_reward + tx_fees + uncle_reward);    	
+		auto end2 = chrono::steady_clock::now();
+    	cout << chrono::duration_cast<chrono::microseconds>(end2 - end1).count() << "\t";    
+		*/
+
+    	
+    	if (mining) {
+    		Logger::instance().log("Block " + to_string(block.number) + " Block Mining starts", Logger::kLogLevelInfo);
+	    	prevBlockHash = mine(block);
+	    	//blockchain.push_back(block);
+	    	Logger::instance().log("Block " + to_string(block.number) + " Block Mining ends", Logger::kLogLevelInfo);
+	    	auto end3 = chrono::steady_clock::now();
+      		minefile << chrono::duration_cast<chrono::milliseconds>(end3 - end2).count() << "\n";
+    	}
+    	
 
     	Logger::instance().log(MSG+" Block "+to_string(block.number)+" clear_memory starts", Logger::kLogLevelInfo);
 		clear_memory(); 
 		Logger::instance().log(MSG+" Block "+to_string(block.number)+" clear_memory ends", Logger::kLogLevelInfo);
 
 		auto end4 = chrono::steady_clock::now();
-		e2efile << chrono::duration_cast<chrono::microseconds>(end4 - start).count() << "\n";
+		e2efile << chrono::duration_cast<chrono::milliseconds>(end4 - start).count() << "\n";
 
 		if (block.number % 100 == 0) {
 			ofstream nextState;

@@ -13,7 +13,7 @@ logs_path = "/home/skmonga/shrey/Distributed-Mining-contract/logs/simulated/ethe
 
 port = 8090
 
-
+mining = 1
 
 for i in [1,2,4,8,16]:
 	print "Updating data path"
@@ -34,7 +34,7 @@ for i in [1,2,4,8,16]:
 			commands = [
 				#"rm -rf {}serial/".format(dir_path),
 				"mkdir -p {}serial/".format(dir_path),
-				"./serial-contract {} {}serial/ ".format(data_path, dir_path)
+				"./serial-contract {} {}serial/ {}".format(data_path, dir_path, mining)
 			]
 
 		elif j == 1:
@@ -42,7 +42,7 @@ for i in [1,2,4,8,16]:
 			commands = [
 				#"rm -rf {}{}_worker/".format(dir_path,j),
 				"mkdir -p {}{}_worker/".format(dir_path,j),
-				"./masterServer {} {} {} {}{}_worker/ &".format(port, j, data_path, dir_path,j),
+				"./masterServer {} {} {} {}{}_worker/ {} &".format(port, j, data_path, dir_path,j,mining),
 				"./workerServer {} {} {}{}_worker/ &".format(port+j,j, dir_path,j)
 				#"./masterClient {}".format(port),
 				#"pkill Server"
@@ -54,7 +54,7 @@ for i in [1,2,4,8,16]:
 			commands = [
 				#"rm -rf {}{}_workers/".format(dir_path,j),
 				"mkdir -p {}{}_workers/".format(dir_path,j),
-				"./masterServer {} {} {} {}{}_workers/ &".format(port, j, data_path, dir_path,j),
+				"./masterServer {} {} {} {}{}_workers/ {} &".format(port, j, data_path, dir_path,j,mining),
 			]
 
 			k = 1
@@ -71,6 +71,7 @@ for i in [1,2,4,8,16]:
 			print cmd
 			#os.system(cmd)
 			p = subprocess.Popen(cmd.split(" "))
+			time.sleep(5)
 			if j == 0:
 				p.wait()
 			else:
@@ -78,13 +79,13 @@ for i in [1,2,4,8,16]:
 
 		if j != 0:
 			print "./masterClient", str(port)
-			time.sleep(i*12)
+			time.sleep(i*20)
 			p = subprocess.Popen(["./masterClient", str(port)])
 			#print p
 			p.wait()
-			time.sleep(12)
+			time.sleep(20)
 			#os.system("pkill Server")
 			for x in processes:
 				print "killing", x
 				x.kill()
-			time.sleep(12)
+			time.sleep(20)

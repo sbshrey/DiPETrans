@@ -37,6 +37,32 @@ struct DataItem {
 	5: required map<i64,i64> votes;
 	6: required list<Transaction> transactions;
 	7: required map<string,PlayerRoll> playerRolls;
+	8: required double _totalSupply;
+	9: required double _maxTotalSupply;
+	10: required double _dropReward;
+	11: required double _maxDropReward;
+	12: required double _rewardBonusTimePeriod;
+	13: required double _nextRewardBonus; 
+	14: required double _rewardTimePeriod;
+	15: required double _rewardStart;
+	16: required double _rewardEnd;
+	17: required double _currentAirdropped;
+	18: required double publicMiningReward;
+	19: required double publicMiningSupply;
+	20: required double publicMineCallsCount;
+	21: required double houseEdge;
+	22: required double houseEdgeDivisor;
+	23: required double totalGenesisAddresses;
+	24: required string genesisCallerAddress;
+	25: required map<string,double> genesisInitialSupply;
+	26: required map<string,double> genesisRewardPerBlock;
+	27: required double maxBlocks;
+	28: required map<string,bool> isGenesisAddress;
+	29: required double overallSupply;
+	30: required bool setupRunning;
+
+
+
 	//2: optional map<string,allowedMap> file1; // allowed map file <filename, allowedMap struct>
 	//3: optional map<string,balanceMap> file2; // balance map file <filename, balanceMap struct>
 	//4: optional map<string,string> file3; // owner file <filename, owner name>

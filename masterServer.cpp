@@ -78,7 +78,7 @@ Block block;
 bool minerStatus = false;
 string filename;
 string dir_path;
-string block_hash = "0000000000000000000000000000000000000000000000000000000000000000";
+string prevBlockHash = "0000000000000000000000000000000000000000000000000000000000000000";
 string difficulty = "00011111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111";
 
 bool mining = false;
@@ -464,6 +464,7 @@ class MasterServiceHandler : virtual public MasterServiceIf {
       */
       auto start = chrono::steady_clock::now();
       block.number = index++;
+      block.prevHash = prevBlockHash;
       if (block.number > 100 and mining) break;
 
       createBlock(data);
@@ -528,15 +529,15 @@ class MasterServiceHandler : virtual public MasterServiceIf {
       txnfile << chrono::duration_cast<chrono::milliseconds>(end2 - start).count() << "\n";
       //txnfile.close();
 
-      Block prevBlock;
+      //Block prevBlock;
       // Mining starts
       if (mining) {
         Logger::instance().log(MSG+" Block " + to_string(block.number) + " Block Mining starts", Logger::kLogLevelInfo);
         minerStatus = false;
         //string block_hash = "0000000000000000000000000000000000000000000000000000000000000000";
         cout << mining << endl;
-        string block_str = convert_block_to_string(prevBlock);
-        block.prevHash = sha256(block_str);
+        //string block_str = convert_block_to_string(prevBlock);
+        //block.prevHash = sha256(block_str);
         //cout << "prev hash calculated" << endl;
         for (auto const& worker : WorkerList) {
           std::shared_ptr<TTransport> socket(new TSocket(worker.workerIP, worker.workerPort));
@@ -568,7 +569,7 @@ class MasterServiceHandler : virtual public MasterServiceIf {
 
       }
       
-      prevBlock = block;
+      //prevBlock = block;
 
       auto end3 = chrono::steady_clock::now();
       minefile << chrono::duration_cast<chrono::milliseconds>(end3 - end2).count() << "\n";
@@ -651,7 +652,7 @@ class MasterServiceHandler : virtual public MasterServiceIf {
       block.nonce = nonce;
       
       string block_str = convert_block_to_string(block);
-      block_hash = sha256(block_str);
+      prevBlockHash = sha256(block_str);
       //cout << nonce << "\t" << block_hash << endl;
 
       minerStatus = true;
@@ -681,7 +682,7 @@ int main(int argc, char **argv) {
   ::apache::thrift::stdcxx::shared_ptr<TProtocolFactory> protocolFactory(new TBinaryProtocolFactory());
   
   // using thread pool with maximum 15 threads to handle incoming requests
-  shared_ptr<ThreadManager> threadManager = ThreadManager::newSimpleThreadManager(10);
+  shared_ptr<ThreadManager> threadManager = ThreadManager::newSimpleThreadManager(5);
   shared_ptr<PosixThreadFactory> threadFactory = shared_ptr<PosixThreadFactory>(new PosixThreadFactory());
   threadManager->threadFactory(threadFactory);
   threadManager->start();

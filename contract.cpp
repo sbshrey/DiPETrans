@@ -29,7 +29,7 @@ using json = nlohmann::json;
 
 
 time_t now = std::chrono::system_clock::to_time_t( std::chrono::system_clock::now() );
-
+/*
 double _totalSupply = 0;
 
 double _maxTotalSupply = 1279200000000000;
@@ -41,9 +41,12 @@ double _rewardTimePeriod = 600; //10 minutes
 double _rewardStart = (double)now;
 double _rewardEnd = (double)now + _rewardTimePeriod;
 double _currentAirdropped = 0;
-
+double dataItem->publicMiningReward = 32000000000000;
+double publicMiningSupply = 0;
+double publicMineCallsCount = 0;
 double houseEdge = 1;
 double houseEdgeDivisor = 1;
+*/
 
 class ERC20
 {
@@ -69,6 +72,9 @@ public:
   void multisend(DataItem* dataItem, string _tokenAddr, std::vector<string> dests, std::vector<int64_t> values);
 
   bool SmartAirdrop(DataItem* dataItem, string _sender, time_t now);
+  void PublicMine(DataItem* dataItem, string _sender);
+  bool SetGenesisAddress(DataItem* dataItem, string _sender, string _address, double amount);
+
 
   ~ERC20();
   
@@ -78,7 +84,28 @@ public:
 ERC20::ERC20(DataItem* dataItem, string _sender, set<string> addresses) {
 	//owner = sender;
 	//cout << "Initializing Accounts" << endl;
-	_totalSupply += 88 * pow(10,14);
+	dataItem->_totalSupply = 88 * pow(10,25);
+	dataItem->_maxTotalSupply = 1279200000000000;
+	dataItem->_dropReward = 26000000000; //260 eGAS - per entry with 30% bonus to start
+	dataItem->_maxDropReward = 1300000000000; //13000 eGAS - per block 10min with 30% bonus to start - 50 entry max
+	dataItem->_rewardBonusTimePeriod = 86400; //1 day each bonus stage
+	dataItem->_nextRewardBonus = (double)now + dataItem->_rewardBonusTimePeriod;
+	dataItem->_rewardTimePeriod = 600; //10 minutes
+	dataItem->_rewardStart = (double)now;
+	dataItem->_rewardEnd = (double)now + dataItem->_rewardTimePeriod;
+	dataItem->_currentAirdropped = 0;
+	dataItem->publicMiningReward = 32000000000000;
+	dataItem->publicMiningSupply = 0;
+	dataItem->publicMineCallsCount = 0;
+	dataItem->houseEdge = 1;
+	dataItem->houseEdgeDivisor = 1;
+	dataItem->maxBlocks = 100000000;
+	dataItem->genesisCallerAddress = "0x0000000000000000000000000000000000000000";
+	//dataItem->genesisTransfersCount = 0;
+	dataItem->overallSupply = 0;
+	dataItem->setupRunning = true;
+	dataItem->totalGenesisAddresses = 0;
+
 	dataItem->balances[dataItem->owner] = pow(10,25);
 	//cout << owner << "\n" << balances[owner] << endl;
 	approve(dataItem, _sender, dataItem->owner,dataItem->balances[dataItem->owner]);
@@ -149,7 +176,7 @@ void ERC20::submitTransaction(DataItem* dataItem, string _sender, string _addres
 }
 
 void ERC20::issue(DataItem* dataItem, string _to, double _amount) {
-	_totalSupply += _amount;
+	dataItem->_totalSupply += _amount;
 	dataItem->balances[_to] += _amount;
 }
 
@@ -159,7 +186,7 @@ void ERC20::playerRollDice(DataItem* dataItem, string _sender, int64_t _rollUnde
 	playerRoll.playerNumber = _rollUnder;
 	playerRoll.playerBetValue = dataItem->value;
 	playerRoll.playerAddress = _sender;
-	playerRoll.playerProfit = ((((dataItem->value * (100-(_rollUnder - 1))) / (_rollUnder - 1)+dataItem->value))*houseEdge/houseEdgeDivisor)-dataItem->value;
+	playerRoll.playerProfit = ((((dataItem->value * (100-(_rollUnder - 1))) / (_rollUnder - 1)+dataItem->value))*dataItem->houseEdge/dataItem->houseEdgeDivisor)-dataItem->value;
 
 	string playerBetId = sha256(to_string(playerRoll.playerNumber) + to_string(playerRoll.playerBetValue) + playerRoll.playerAddress + to_string(playerRoll.playerProfit)); 
 	dataItem->playerRolls[playerBetId] = playerRoll;
@@ -168,34 +195,66 @@ void ERC20::playerRollDice(DataItem* dataItem, string _sender, int64_t _rollUnde
 
 
 bool ERC20::SmartAirdrop(DataItem* dataItem, string _sender, time_t now) {
-	if ((double)now < _rewardEnd and _currentAirdropped < _maxDropReward) {
+	if ((double)now < dataItem->_rewardEnd and dataItem->_currentAirdropped < dataItem->_maxDropReward) {
 		cout << "SmartAirdrop reverted" << endl;
 		//revert();
 		return true;
-	} else if ((double)now >= _rewardEnd) {
-		_rewardStart = (double)now;
-		_rewardEnd = (double)now + _rewardTimePeriod;
-		_currentAirdropped = 0;
+	} else if ((double)now >= dataItem->_rewardEnd) {
+		dataItem->_rewardStart = (double)now;
+		dataItem->_rewardEnd = (double)now + dataItem->_rewardTimePeriod;
+		dataItem->_currentAirdropped = 0;
 	}
 
-	if (now >= _nextRewardBonus) {
-		_nextRewardBonus = now + _rewardBonusTimePeriod;
-		_dropReward = _dropReward - 1000000000;
-		_maxDropReward = _maxDropReward - 50000000000;
-		_currentAirdropped = 0;
-		_rewardStart = (double)now;
-		_rewardEnd = (double)now + _rewardTimePeriod;
+	if (now >= dataItem->_nextRewardBonus) {
+		dataItem->_nextRewardBonus = now + dataItem->_rewardBonusTimePeriod;
+		dataItem->_dropReward = dataItem->_dropReward - 1000000000;
+		dataItem->_maxDropReward = dataItem->_maxDropReward - 50000000000;
+		dataItem->_currentAirdropped = 0;
+		dataItem->_rewardStart = (double)now;
+		dataItem->_rewardEnd = (double)now + dataItem->_rewardTimePeriod;
 	}
 
-	if ((_currentAirdropped < _maxDropReward) and (_totalSupply < _maxTotalSupply))
+	if ((dataItem->_currentAirdropped < dataItem->_maxDropReward) and (dataItem->_totalSupply < dataItem->_maxTotalSupply))
 	{
-		dataItem->balances[_sender] += _dropReward;
-		_currentAirdropped += _dropReward;
-		_totalSupply += _dropReward;
+		dataItem->balances[_sender] += dataItem->_dropReward;
+		dataItem->_currentAirdropped += dataItem->_dropReward;
+		dataItem->_totalSupply += dataItem->_dropReward;
 		//Transfer(this, msg.sender, _dropReward);
 		//transfer(dataItem,_sender ,_sender, amount);
 		return true;
 	}				
+	return false;
+}
+
+
+
+void ERC20::PublicMine(DataItem* dataItem, string _sender) {
+	//if (isGenesisAddress[msg.sender]) revert();
+	if (dataItem->publicMiningReward < 10000)	dataItem->publicMiningReward = 10000;	
+	dataItem->balances[_sender] += dataItem->publicMiningReward;
+	dataItem->publicMiningSupply += dataItem->publicMiningReward;
+	//Transfer(this, msg.sender, dataItem->publicMiningReward);
+	//PublicMined(msg.sender, dataItem->publicMiningReward);
+	dataItem->publicMiningReward -= 10000;
+	dataItem->publicMineCallsCount += 1;
+}
+
+
+bool ERC20::SetGenesisAddress(DataItem* dataItem, string _sender, string _address, double amount) {
+	if (dataItem->setupRunning) //Once setupRunning is set to false there is no more possibility to Generate Genesis Addresses, this can be verified with the function isSetupRunning()
+	{
+		if (_sender == dataItem->genesisCallerAddress)
+		{
+			if (dataItem->balances[_address] == 0)
+				dataItem->totalGenesisAddresses += 1;							
+			dataItem->balances[_address] += amount;
+			dataItem->genesisInitialSupply[_address] += amount;
+			dataItem->genesisRewardPerBlock[_address] += (amount / dataItem->maxBlocks);			
+			dataItem->isGenesisAddress[_address] = true;			
+			dataItem->overallSupply += amount;
+			return true;
+		}
+	}
 	return false;
 }
 
@@ -617,16 +676,56 @@ void call_contract(DataItem *dataItem, string contractAddress, string senderAddr
 		  	cout << "SmartAirdrop executed" << endl;
 		} else if (fxHash.compare("0x87ccccb3") == 0)
 		{
-		  // https://etherscan.io/address/0x5f6e7fb7fe92ea7822472bb0e8f1be60d6a4ea50#code
-		  //cout << "PublicMine executes" << endl;
+		  	// https://etherscan.io/address/0x5f6e7fb7fe92ea7822472bb0e8f1be60d6a4ea50#code
+		  	//cout << "PublicMine executes" << endl;
+			/*
 
-		  cout << "PublicMine executed" << endl;
+			function PublicMine() {
+				if (isGenesisAddress[msg.sender]) revert();
+				if (dataItem->publicMiningReward < 10000)	dataItem->publicMiningReward = 10000;	
+				balances[msg.sender] += dataItem->publicMiningReward;
+				publicMiningSupply += dataItem->publicMiningReward;
+				Transfer(this, msg.sender, dataItem->publicMiningReward);
+				PublicMined(msg.sender, dataItem->publicMiningReward);
+				dataItem->publicMiningReward -= 10000;
+				publicMineCallsCount += 1;
+			}
+
+			*/
+
+			tc->PublicMine(dataItem, senderAddress);
+			cout << "PublicMine executed" << endl;
 		} else if (fxHash.compare("0x0d571742") == 0)
 		{
-		  // https://etherscan.io/address/0x5f6e7fb7fe92ea7822472bb0e8f1be60d6a4ea50#code
-		  //cout << "setGenesisAddress executes" << endl;
+			// https://etherscan.io/address/0x5f6e7fb7fe92ea7822472bb0e8f1be60d6a4ea50#code
+			//cout << "setGenesisAddress executes" << endl;
 
-		  cout << "setGenesisAddress executed" << endl;
+			/*
+			function setGenesisAddress(address _address, uint256 amount) public returns (bool success)
+			{
+				if (setupRunning) //Once setupRunning is set to false there is no more possibility to Generate Genesis Addresses, this can be verified with the function isSetupRunning()
+				{
+					if (msg.sender == genesisCallerAddress)
+					{
+						if (balances[_address] == 0)
+							totalGenesisAddresses += 1;							
+						balances[_address] += amount;
+						genesisInitialSupply[_address] += amount;
+						genesisRewardPerBlock[_address] += (amount / maxBlocks);			
+						isGenesisAddress[_address] = true;			
+						overallSupply += amount;
+						return true;
+					}
+				}
+				return false;
+			}
+			*/
+
+			string address = "0x" + input.substr(10,64);
+			address.erase(2, min(address.find_first_not_of("0"), address.size()-1));
+			double amount = hexTodouble("0x" + input.substr(74,64));
+			bool status = tc->SetGenesisAddress(dataItem, senderAddress, address, amount);
+		  	cout << "setGenesisAddress executed" << endl;
 		}
 		else {
 		  //cout << input.size() << endl << input << endl;  

@@ -36,7 +36,7 @@ using namespace  ::WorkerService;
 using namespace  ::SharedService;
 
 std::map<string, int64_t> GlobalDataItemsMap;
-std::vector<string> contract_addresses;
+
 //std::vector<string> addresses;
     
 
@@ -145,11 +145,9 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
     
   }
 
-  void recvTransactions( ::SharedService::WorkerResponse& _return, const std::vector< ::SharedService::Transaction> & TransactionsList, const std::map<std::string,  ::SharedService::DataItem> & dataItemMap) {
+  void recvTransactions( ::SharedService::WorkerResponse& _return, const std::vector< ::SharedService::Transaction> & TransactionsList, const std::map<std::string,  ::SharedService::DataItem> & dataItemMap, const std::set<std::string> & contractAddresses) {
     // Your implementation goes here
     
-
-
     double normal_txn_time = 0;
     double contract_txn_time = 0;
 
@@ -173,6 +171,16 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
     }
     Logger::instance().log(MSG+" dataItemMap ends", Logger::kLogLevelInfo);
 
+    Logger::instance().log(MSG+" contractAddresses starts", Logger::kLogLevelInfo);
+    for (auto const& address: contractAddresses)
+    {
+      _return.contractAddresses.push_back(address);
+      //cout << "txn value at worker " << _return.dataItemMap[address.first].value << "\t" << address.second.value << endl;
+    }
+    Logger::instance().log(MSG+" dataItemMap ends", Logger::kLogLevelInfo);
+
+
+
     Logger::instance().log(MSG+" TransactionsList starts", Logger::kLogLevelInfo);
     //cout << endl;
     for (auto const& tx: TransactionsList) {
@@ -184,7 +192,8 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
       
       bool status= false;
       if (tx.toAddress == "creates") {
-        contract_addresses.push_back(tx.creates);
+        //contract_addresses.push_back(tx.creates);
+        _return.contractAddresses.push_back(tx.creates);
         DataItem localDataItem;
         call_contract(&localDataItem, tx.creates, tx.fromAddress, tx.toAddress, tx.value);
         
@@ -203,8 +212,8 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
         sc_cnt++;
       } else {
         bool flag = false;
-        std::vector<string>::iterator it = std::find (contract_addresses.begin(), contract_addresses.end(), tx.toAddress); 
-        if (it != contract_addresses.end()) {  
+        std::vector<string>::iterator it = std::find (_return.contractAddresses.begin(), _return.contractAddresses.end(), tx.toAddress); 
+        if (it != _return.contractAddresses.end()) {  
           DataItem localDataItem = _return.dataItemMap[tx.toAddress];
           call_contract(&localDataItem, tx.toAddress, tx.fromAddress, tx.input, tx.value);
           _return.dataItemMap[tx.toAddress] = localDataItem;
@@ -222,8 +231,8 @@ class WorkerServiceHandler : virtual public WorkerServiceIf {
           flag = true;
         }
 
-        it = std::find (contract_addresses.begin(), contract_addresses.end(), tx.fromAddress); 
-        if (it != contract_addresses.end() and !flag) {   
+        it = std::find (_return.contractAddresses.begin(), _return.contractAddresses.end(), tx.fromAddress); 
+        if (it != _return.contractAddresses.end() and !flag) {   
           DataItem localDataItem = _return.dataItemMap[tx.fromAddress];
           call_contract(&localDataItem, tx.fromAddress, tx.toAddress, tx.input, tx.value);
           _return.dataItemMap[tx.fromAddress] = localDataItem;

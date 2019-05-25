@@ -122,6 +122,7 @@ struct thread_data {
 
 map<int16_t,vector<Transaction>> sendTransactionMap;
 map<int16_t, set<int16_t>> ccTransactionMap;
+set<string> contractAddresses;
 
 
 string convert_block_to_string(Block block) {
@@ -347,7 +348,7 @@ void *connectWorker (void *threadarg) {
 
   WorkerResponse localWorkerResponse;
   
-  workerClient.recvTransactions(localWorkerResponse,sendTransactionMap[worker->workerID],localDataItemMap); // returns local worker response
+  workerClient.recvTransactions(localWorkerResponse,sendTransactionMap[worker->workerID],localDataItemMap, contractAddresses); // returns local worker response
   cout << worker->threadID << ":" << sendTransactionMap[worker->workerID].size() << ":" << localWorkerResponse.dataItemMap.size() << "\n";
   Logger::instance().log(MSG+" Block "+to_string(worker->number) +" WorkerID "+to_string(worker->workerID)+" recvTransactions() ends", Logger::kLogLevelInfo);
   
@@ -382,6 +383,11 @@ void *connectWorker (void *threadarg) {
     //cout << "owner " << dataItemMap[it.first].owner << endl;
 
     
+  }
+
+  for (auto it :localWorkerResponse.contractAddresses)
+  {
+    contractAddresses.insert(it);
   }
 
   transport->close();

@@ -71,7 +71,7 @@ struct DataItem {
 struct WorkerResponse {
 	1: required map<string,DataItem> dataItemMap;
 	2: required list<i16> transactionIDList;
-	3: optional double transactionFees;
+	3: required list<string> contractAddresses;
 }
 
 

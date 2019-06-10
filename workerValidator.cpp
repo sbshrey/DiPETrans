@@ -36,7 +36,7 @@ using namespace  ::WorkerService;
 using namespace  ::SharedService;
 
 std::map<string, int64_t> GlobalDataItemsMap;
-
+std::vector<string> contract_addresses;
 //std::vector<string> addresses;
     
 
@@ -45,19 +45,17 @@ string dir_path;
 string MSG="WorkerServer";
 
 int masterPort = 8090;
-//string masterIP = "192.168.0.11";
 string masterIP = "localhost";
 
 
 string convert_block_to_string(Block block) {
   stringstream ss;
-  ss << block.number << block.prevHash << block.nonce; // << block.transactionsList;
-  //ss << block.finalDataItemMap << block.sendTxnMap;
+  ss << to_string(block.number) << block.prevHash << to_string(block.nonce);
   for (auto& tx : block.transactionsList) {
-    ss << tx.transactionID;
+    ss << to_string(tx.transactionID);
     ss << tx.toAddress;
     ss << tx.fromAddress;
-    ss << tx.value;
+    ss << to_string(tx.value);
     ss << tx.input;
     ss << tx.creates;
     //str.append(to_string(tx.gas));
@@ -84,13 +82,6 @@ Block createBlock(Block b) {
     return block;
 }
 
-
-
-struct mine_data {
-	Block block;
-	int64_t nonce;
-	int16_t interval;
-};
 
 
 string difficulty = "00011111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111";
@@ -120,73 +111,14 @@ bool execute (Transaction transaction, int status) {
 */
 
 
-
-void *mine(void *threadarg) {
-struct mine_data *td;
-  td = (struct mine_data *) threadarg;
-
-	Block newBlock = createBlock(td->block);
-
-    newBlock.nonce = td->nonce;
-    string hash;
-    
-    //cout << "thread mine starts" << endl;
-    while (true) {
-      string block_str = convert_block_to_string(newBlock);
-      hash = sha256(block_str);
-      //cout << newBlock.nonce << ",";   
-      if (hash.compare(difficulty) < 0) {
-        //cout << newBlock.nonce << endl;
-        //cout << block_str << endl;
-        cout << "Success W" << WID << " " << newBlock.nonce << " " << hash << endl;
-
-        break;
-      }
-
-      newBlock.nonce+=td->interval;
-    }
-
-    //cout << "thread mine ends" << endl;
-
-
-    std::shared_ptr<TTransport> socket(new TSocket(masterIP, masterPort));
-    std::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
-    std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
-    MasterServiceClient masterClient(protocol);
-
-    //Logger::instance().log(MSG+" Block "+to_string(block.number) +" connection to master "+WID+" starts", Logger::kLogLevelInfo);
-    transport->open();
-
-
-    //Logger::instance().log(MSG+" Block "+to_string(block.number) +" worker "+WID+" mineBlock() starts", Logger::kLogLevelInfo);
-
-    // sent transaction to execute      
-
-    masterClient.recvMiningStatus(newBlock.nonce, newBlock.number); // returns local worker response
-    //cout << worker->threadID << ":" << sendTransactionMap[worker->workerID].size() << "\t";
-
-    //Logger::instance().log(MSG+" Block "+to_string(block.number) +" WorkerID "+WID+" mineBlock() ends", Logger::kLogLevelInfo);
-
-    transport->close();
-    //Logger::instance().log(MSG+" Block "+to_string(block.number) +" connection to master "+WID+" ends", Logger::kLogLevelInfo);
-
-    //free(td);
-    delete td;
-
-    //pthread_exit(NULL);
-}
-
-
-
 ofstream nttfile;
 ofstream cttfile;
 
 
 
-struct mine_data td;
 
 
-class WorkerServiceHandler : public WorkerServiceIf {
+class WorkerServiceHandler : virtual public WorkerServiceIf {
  public:
   WorkerServiceHandler() {
     // Your initialization goes here
@@ -213,13 +145,15 @@ class WorkerServiceHandler : public WorkerServiceIf {
     
   }
 
-  void recvTransactions( ::SharedService::WorkerResponse& _return, const std::vector< ::SharedService::Transaction> & TransactionsList, const std::map<std::string,  ::SharedService::DataItem> & dataItemMap, const std::set<std::string> & contractAddresses) {
+  void recvTransactions( ::SharedService::WorkerResponse& _return, const std::vector< ::SharedService::Transaction> & TransactionsList, const std::map<std::string,  ::SharedService::DataItem> & dataItemMap) {
     // Your implementation goes here
     
+
+
     double normal_txn_time = 0;
     double contract_txn_time = 0;
 
-    //Logger::instance().log(MSG+" worker "+ WID +" recvTransactions starts", Logger::kLogLevelInfo);
+    Logger::instance().log(MSG+" worker "+ WID +" recvTransactions starts", Logger::kLogLevelInfo);
     auto start = chrono::steady_clock::now();
     int successful_transactions = 0;
     int failed_transactions = 0;
@@ -231,27 +165,15 @@ class WorkerServiceHandler : public WorkerServiceIf {
 
     double tx_fees = 0;
 
-    //Logger::instance().log(MSG+" dataItemMap starts", Logger::kLogLevelInfo);
+    Logger::instance().log(MSG+" dataItemMap starts", Logger::kLogLevelInfo);
     for (auto const& address: dataItemMap)
     {
       _return.dataItemMap[address.first] = address.second;
       //cout << "txn value at worker " << _return.dataItemMap[address.first].value << "\t" << address.second.value << endl;
     }
-    //Logger::instance().log(MSG+" dataItemMap ends", Logger::kLogLevelInfo);
+    Logger::instance().log(MSG+" dataItemMap ends", Logger::kLogLevelInfo);
 
-    //Logger::instance().log(MSG+" contractAddresses starts", Logger::kLogLevelInfo);
-    //cout << "contractAddresses size: " << contractAddresses.size() << endl;
-    for (auto const& address: contractAddresses)
-    {
-	//cout << address << endl;
-      _return.contractAddresses.insert(address);
-      //cout << "txn value at worker " << _return.dataItemMap[address.first].value << "\t" << address.second.value << endl;
-    }
-    //Logger::instance().log(MSG+" contractAddresses ends", Logger::kLogLevelInfo);
-
-
-
-    //Logger::instance().log(MSG+" TransactionsList starts", Logger::kLogLevelInfo);
+    Logger::instance().log(MSG+" TransactionsList starts", Logger::kLogLevelInfo);
     //cout << endl;
     for (auto const& tx: TransactionsList) {
       //cout << "tx" << tx.transactionID << "\t";
@@ -262,9 +184,7 @@ class WorkerServiceHandler : public WorkerServiceIf {
       
       bool status= false;
       if (tx.toAddress == "creates") {
-        //contract_addresses.push_back(tx.creates);
-        //cout << "creates" << endl;
-        _return.contractAddresses.insert(tx.creates);
+        contract_addresses.push_back(tx.creates);
         DataItem localDataItem;
         call_contract(&localDataItem, tx.creates, tx.fromAddress, tx.toAddress, tx.value);
         
@@ -283,9 +203,8 @@ class WorkerServiceHandler : public WorkerServiceIf {
         sc_cnt++;
       } else {
         bool flag = false;
-        std::set<string>::iterator it = std::find (_return.contractAddresses.begin(), _return.contractAddresses.end(), tx.toAddress); 
-        if (it != _return.contractAddresses.end()) {  
-	  //cout << "contractAddress found in to" << endl;
+        std::vector<string>::iterator it = std::find (contract_addresses.begin(), contract_addresses.end(), tx.toAddress); 
+        if (it != contract_addresses.end()) {  
           DataItem localDataItem = _return.dataItemMap[tx.toAddress];
           call_contract(&localDataItem, tx.toAddress, tx.fromAddress, tx.input, tx.value);
           _return.dataItemMap[tx.toAddress] = localDataItem;
@@ -303,9 +222,8 @@ class WorkerServiceHandler : public WorkerServiceIf {
           flag = true;
         }
 
-        it = std::find (_return.contractAddresses.begin(), _return.contractAddresses.end(), tx.fromAddress); 
-        if (it != _return.contractAddresses.end() and !flag) {
-	  //cout << "contractAddress found in from" << endl;  
+        it = std::find (contract_addresses.begin(), contract_addresses.end(), tx.fromAddress); 
+        if (it != contract_addresses.end() and !flag) {   
           DataItem localDataItem = _return.dataItemMap[tx.fromAddress];
           call_contract(&localDataItem, tx.fromAddress, tx.toAddress, tx.input, tx.value);
           _return.dataItemMap[tx.fromAddress] = localDataItem;
@@ -324,13 +242,12 @@ class WorkerServiceHandler : public WorkerServiceIf {
         }
 
         if (!flag) {
-	  //cout << "contractAddress not found" << endl;
           if (_return.dataItemMap[tx.fromAddress].value >= tx.value) {
             _return.dataItemMap[tx.fromAddress].value -=  tx.value;
             _return.dataItemMap[tx.toAddress].value += tx.value;
             status = true;  
           } else {
-            //cout << "nsc txn " << _return.dataItemMap[tx.fromAddress].value << "\t" << tx.value << endl;
+            cout << "nsc txn " << _return.dataItemMap[tx.fromAddress].value << "\t" << tx.value << endl;
             status = false;
           }
           txn_end = chrono::steady_clock::now();
@@ -361,60 +278,25 @@ class WorkerServiceHandler : public WorkerServiceIf {
     nttfile << normal_txn_time << endl;
 
     //_return.transactionFees = tx_fees;
-    //Logger::instance().log(MSG+" TransactionsList ends", Logger::kLogLevelInfo);
+    Logger::instance().log(MSG+" TransactionsList ends", Logger::kLogLevelInfo);
 
-    //Logger::instance().log(MSG+" worker "+ WID +" recvTransactions ends", Logger::kLogLevelInfo);
+    Logger::instance().log(MSG+" worker "+ WID +" recvTransactions ends", Logger::kLogLevelInfo);
     auto end = chrono::steady_clock::now();
   }
 
-  void mineBlock(const  ::SharedService::Block& block, const int64_t nonce, const int16_t interval) {
+  void mineBlock(const  ::MasterService::Block& block, const int64_t nonce, const int16_t interval) {
     // Your implementation goes here
     //block.nonce = nonce;
-    cout << "worker mining " << WID << endl;
-
-    pthread_t thread;
-        //pthread_attr_t attr;
-        struct mine_data *td = NULL;
-	td = new(nothrow) struct mine_data; //(struct mine_data *)malloc(sizeof(struct mine_data));
-	//struct mine_data td;
-	if (!td) {
-		cout << "allocation failed" << endl;
-	} else {
-		td->block = block;
-		td->nonce = nonce;
-		td->interval = interval;
-	}
-        int rc;
-        //int thID = 0;
-        void *status;
-
-	cout << "creating thread" << endl;
-	rc = pthread_create(&thread, NULL, mine, (void *)td);
-
-          if (rc) {
-             cout << "WS create failed" << endl;
-             exit(-1);
-          } else {
-		cout << "mine thread created" << endl;
-	}
-    //cout << "Exiting" << endl;
-    //pthread_exit(NULL);
-
-	/*
+    //cout << "worker mining " << endl;
     Block newBlock = createBlock(block);
 
     newBlock.nonce = nonce;
     string hash;
-    
     while (true) {
       string block_str = convert_block_to_string(newBlock);
       hash = sha256(block_str);
-      cout << newBlock.nonce << ",";  
       if (hash.compare(difficulty) < 0) {
-        cout << newBlock.nonce << endl;
-        cout << block_str << endl;
-        cout << "Success W" << WID << " " << newBlock.nonce << " " << hash << endl;
-
+        //cout << newBlock.nonce << endl;
         break;
       }
 
@@ -433,10 +315,10 @@ class WorkerServiceHandler : public WorkerServiceIf {
 
     Logger::instance().log(MSG+" Block "+to_string(block.number) +" worker "+WID+" mineBlock() starts", Logger::kLogLevelInfo);
 
-     sent transaction to execute     
+    // sent transaction to execute     
     
     masterClient.recvMiningStatus(newBlock.nonce, newBlock.number); // returns local worker response
-    cout << worker->threadID << ":" << sendTransactionMap[worker->workerID].size() << "\t";
+    //cout << worker->threadID << ":" << sendTransactionMap[worker->workerID].size() << "\t";
 
     Logger::instance().log(MSG+" Block "+to_string(block.number) +" WorkerID "+WID+" mineBlock() ends", Logger::kLogLevelInfo);
     
@@ -446,7 +328,7 @@ class WorkerServiceHandler : public WorkerServiceIf {
 
     //_return.number = newBlock.number;
     //_return.nonce = newBlock.nonce;
-	*/
+
     //printf("mineBlock\n");
   }
 

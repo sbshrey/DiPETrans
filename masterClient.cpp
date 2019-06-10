@@ -29,8 +29,10 @@ using namespace ::SharedService;
 
 string MSG="MasterClient";
 
+//192.168.0.11
+
 int main(int argc, char const *argv[]) {
-	int port = atoi(argv[1]);
+  int port = atoi(argv[1]);
   std::shared_ptr<TTransport> socket(new TSocket("localhost", port));
   std::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
   std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));

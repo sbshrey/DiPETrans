@@ -4,6 +4,7 @@
 #include "gen-cpp/MasterService.h"
 #include "gen-cpp/WorkerService.h"
 #include "gen-cpp/SharedService.h"
+#include "gen-cpp/MasterValidation.h"
 
 #include "nlohmann/json.hpp"
 
@@ -28,6 +29,7 @@
 #include <thrift/TToString.h>
 
 #include <iostream>
+#include <exception>
 #include <string>
 #include <pthread.h>
 #include <thread>
@@ -72,7 +74,7 @@ using namespace ::apache::thrift::server;
 using namespace  ::MasterService;
 using namespace  ::WorkerService;
 using namespace  ::SharedService;
-
+using namespace  ::MasterValidation;
 
 Block block;
 bool minerStatus = false;
@@ -81,11 +83,12 @@ string dir_path;
 string prevBlockHash = "0000000000000000000000000000000000000000000000000000000000000000";
 string difficulty = "00011111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111";
 
+
 bool mining = false;
 
 vector<WorkerNode> WorkerList;
 
-
+vector<Transaction> txnsList;
 
 map<string,DataItem> dataItemMap;
 map<int16_t, map<set<string>,set<int16_t>>> GlobalConflictsMap; // map<list<addresses>, list<txid>>
@@ -102,6 +105,13 @@ json ethereum_data;
 int NUM_WORKERS = 5;
 int NUM_THREADS = 5;
 
+int masterPort = 10090;
+//string masterIP = "192.168.0.17";
+string masterIP = "localhost";
+
+int masterPort2 = 11090;
+//string masterIP2 = "192.168.0.17";
+string masterIP2 = "localhost";
 
 //pthread_t global_threads[10];
 
@@ -127,9 +137,9 @@ set<string> contractAddresses;
 
 string convert_block_to_string(Block block) {
   stringstream ss;
-  ss << to_string(block.number) << block.prevHash << to_string(block.nonce);
+  ss << block.number << block.prevHash << block.nonce; //<< block.transactionsList;
   for (auto& tx : block.transactionsList) {
-    ss << to_string(tx.transactionID);
+    ss << tx.transactionID;
     ss << tx.toAddress;
     ss << tx.fromAddress;
     ss << tx.value;
@@ -143,10 +153,10 @@ string convert_block_to_string(Block block) {
 
 
 void createBlock(json::iterator data) {
-  Logger::instance().log(MSG+" Block "+to_string(block.number)+" creation starts", Logger::kLogLevelInfo);
+  //Logger::instance().log(MSG+" Block "+to_string(block.number)+" creation starts", Logger::kLogLevelInfo);
   //block.number = index++;stoi(data.key());//atoi(d.key().c_str());
   
-  Logger::instance().log(MSG+" Block "+to_string(block.number)+" transactionsList starts", Logger::kLogLevelInfo);
+  //Logger::instance().log(MSG+" Block "+to_string(block.number)+" transactionsList starts", Logger::kLogLevelInfo);
   int16_t txid=0;
   for (auto& tx: (*data)["transactions"]) {
     Transaction transaction;
@@ -158,20 +168,23 @@ void createBlock(json::iterator data) {
     transaction.creates = tx["creates"]; 
     block.transactionsList.push_back(transaction);
   }
-  Logger::instance().log(MSG+" Block "+to_string(block.number)+" transactionsList ends", Logger::kLogLevelInfo);
+  //Logger::instance().log(MSG+" Block "+to_string(block.number)+" transactionsList ends", Logger::kLogLevelInfo);
 
-  Logger::instance().log(MSG+" Block "+to_string(block.number)+" creation ends", Logger::kLogLevelInfo);
+  //Logger::instance().log(MSG+" Block "+to_string(block.number)+" creation ends", Logger::kLogLevelInfo);
 }
 
 // Clears memory of global data structures after every block creation
 void clear_memory() {
-  sendTransactionMap.clear();
+  //sendTransactionMap.clear();
   ccTransactionMap.clear();
   GlobalConflictsMap.clear();
   LocalConflictsMap.clear();
   GlobalWorkerResponsesList.clear();
   AdjacencyMap.clear();
   block.transactionsList.clear();
+  block.finalDataItemMap.clear();
+  block.sendTxnMap.clear();
+  txnsList.clear();
 }
 
 
@@ -198,8 +211,9 @@ void DFSUtil (int ccID, string v, map<string,bool> &visited) {
 void analyze(vector<Transaction> TransactionList) {
   std::set<string> AddressList;
 
-  Logger::instance().log(MSG+" AdjacencyMap starts", Logger::kLogLevelInfo);
+  //Logger::instance().log(MSG+" AdjacencyMap starts", Logger::kLogLevelInfo);
   for (auto const& tx: TransactionList) {
+    txnsList.push_back(tx);
     LocalConflictsMap[tx.fromAddress].push_back(tx.transactionID);
     if (tx.toAddress == "creates") {
       LocalConflictsMap[tx.creates].push_back(tx.transactionID);
@@ -216,7 +230,7 @@ void analyze(vector<Transaction> TransactionList) {
     AddressList.insert(tx.fromAddress);
     
   }
-  Logger::instance().log(MSG+" AdjacencyMap ends", Logger::kLogLevelInfo);
+  //Logger::instance().log(MSG+" AdjacencyMap ends", Logger::kLogLevelInfo);
 
   map<string,bool> visited;
 
@@ -284,7 +298,7 @@ void *connectWorker (void *threadarg) {
   struct thread_data *worker;
   worker = (struct thread_data *) threadarg;
 
-  Logger::instance().log(MSG+" Block "+to_string(worker->number) +" thread "+ to_string(worker->workerID) +" starts", Logger::kLogLevelInfo);
+  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" thread "+ to_string(worker->workerID) +" starts", Logger::kLogLevelInfo);
       
 
   std::shared_ptr<TTransport> socket(new TSocket(worker->workerIP, worker->workerPort));
@@ -292,108 +306,62 @@ void *connectWorker (void *threadarg) {
   std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
   WorkerServiceClient workerClient(protocol);
 
-  Logger::instance().log(MSG+" Block "+to_string(worker->number) +" connection to worker "+to_string(worker->workerID)+" starts", Logger::kLogLevelInfo);
+  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" connection to worker "+to_string(worker->workerID)+" starts", Logger::kLogLevelInfo);
   transport->open();
 
-  Logger::instance().log(MSG+" Block "+to_string(worker->number) +" localDataItemMap generation for worker "+to_string(worker->workerID)+" starts", Logger::kLogLevelInfo);
+  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" localDataItemMap generation for worker "+to_string(worker->workerID)+" starts", Logger::kLogLevelInfo);
   
   // Creates data items map of address which are going to be modified by the transactions sent to worker
   // instead of sending complete map of addresses
 
-  //std::vector<string> contractsList;
-
-  
-  map<string,double> bal;
-  map<string,map<string,double>> allow;
-  map<int64_t, int64_t> vote;
   map<string,DataItem> localDataItemMap;
   for (auto& tx: sendTransactionMap[worker->workerID]) {
-    // add code to get the current state of contract
-    
-    /*
-    localDataItemMap[tx.fromAddress].value = dataItemMap[tx.fromAddress].value;
-    localDataItemMap[tx.fromAddress].owner = "";
-    localDataItemMap[tx.fromAddress].balances = bal;
-    localDataItemMap[tx.fromAddress].votes = vote;
-    localDataItemMap[tx.fromAddress].allowed = allow;
-    
-    localDataItemMap[tx.toAddress].value = dataItemMap[tx.toAddress].value;
-    localDataItemMap[tx.toAddress].owner = "";
-    localDataItemMap[tx.toAddress].balances = bal;
-    localDataItemMap[tx.toAddress].votes = vote;
-    localDataItemMap[tx.toAddress].allowed = allow;
-
-    localDataItemMap[tx.creates].value = dataItemMap[tx.creates].value;
-    localDataItemMap[tx.creates].owner = "";
-    localDataItemMap[tx.creates].balances = bal;
-    localDataItemMap[tx.creates].votes = vote;
-    localDataItemMap[tx.creates].allowed = allow;
-    */
-
+    // add code to get the current state of contract  
 
     localDataItemMap[tx.fromAddress] = dataItemMap[tx.fromAddress];
     localDataItemMap[tx.toAddress] = dataItemMap[tx.toAddress];
-    //localDataItemMap[tx.creates] = dataItemMap[tx.creates];
 
-    //cout << "nsc txn at master " << dataItemMap[tx.fromAddress].value << "\t" << tx.value << endl;
 
   }
-  //cout << localDataItemMap.size() << endl;
 
 
 
-  Logger::instance().log(MSG+" Block "+to_string(worker->number) +" localDataItemMap generation for worker "+to_string(worker->workerID)+" ends", Logger::kLogLevelInfo);
+  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" localDataItemMap generation for worker "+to_string(worker->workerID)+" ends", Logger::kLogLevelInfo);
   
-  Logger::instance().log(MSG+" Block "+to_string(worker->number) +" WorkerID "+to_string(worker->workerID)+" recvTransactions() starts", Logger::kLogLevelInfo);
+  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" WorkerID "+to_string(worker->workerID)+" recvTransactions() starts", Logger::kLogLevelInfo);
 
   WorkerResponse localWorkerResponse;
   
   workerClient.recvTransactions(localWorkerResponse,sendTransactionMap[worker->workerID],localDataItemMap, contractAddresses); // returns local worker response
   cout << worker->threadID << ":" << sendTransactionMap[worker->workerID].size() << ":" << localWorkerResponse.dataItemMap.size() << "\n";
-  Logger::instance().log(MSG+" Block "+to_string(worker->number) +" WorkerID "+to_string(worker->workerID)+" recvTransactions() ends", Logger::kLogLevelInfo);
+  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" WorkerID "+to_string(worker->workerID)+" recvTransactions() ends", Logger::kLogLevelInfo);
   
 
-  /*
-
-  struct DataItem {
-  //1: required string address;
-  double value;
-  string owner;
-  map<string,double> balances;
-  map<string,map<string,double>> allowed;
-  map<int64_t, int64_t> votes;
-  //map<string,allowedMap> file1; // allowed map file <filename, allowedMap struct>
-  //map<string,balanceMap> file2; // balance map file <filename, balanceMap struct>
-  //map<string,string> file3; // owner file <filename, owner name>
-};
-
-  */
-  //cout << "size " << localWorkerResponse.dataItemMap.size() << endl;
+  //cout << "WR dataItemMap" << endl;
   for (auto it :localWorkerResponse.dataItemMap)
   {
-    //cout << it.second.balances.size() << "\t" << it.second.allowed.size() << endl;
-
     dataItemMap[it.first] = it.second;
-    //dataItemMap[it.first].value = it.second.value;
-    //dataItemMap[it.first].owner = it.second.owner;
-    //dataItemMap[it.first].balances = it.second.balances;
-    //dataItemMap[it.first].allowed = it.second.allowed;
-    //dataItemMap[it.first].votes = it.second.votes;
+  }
+  //cout << "WR txnsList" << endl;
 
-    //cout << "owner " << dataItemMap[it.first].owner << endl;
-
-    
+  for (auto it : localWorkerResponse.transactionIDList) {
+    //cout << "txid: " << it << endl;
+    block.transactionsList.push_back(txnsList[it]);
   }
 
+  //cout << "WR cntrctAddr" << endl;
   for (auto it :localWorkerResponse.contractAddresses)
   {
     contractAddresses.insert(it);
   }
 
   transport->close();
-  Logger::instance().log(MSG+" Block "+to_string(worker->number) +" connection to worker "+to_string(worker->workerID)+" ends", Logger::kLogLevelInfo);
-  Logger::instance().log(MSG+" Block "+to_string(worker->number) +" thread "+ to_string(worker->workerID) +" ends", Logger::kLogLevelInfo);
+  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" connection to worker "+to_string(worker->workerID)+" ends", Logger::kLogLevelInfo);
+  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" thread "+ to_string(worker->workerID) +" ends", Logger::kLogLevelInfo);
       
+
+  delete worker;
+
   pthread_exit(&worker->threadID);
 }
 
@@ -406,19 +374,24 @@ class MasterServiceHandler : virtual public MasterServiceIf {
     // Your initialization goes here
     
     int16_t port = 8091;
+    //string ip = "192.168.0.";
     string ip = "localhost";
-    //string ip = "10.24.50.57";
 
+    //vector<string> masterIPList;
+
+    //int wip = 12;
+    int wip[5] = {13,14,15,16,34};
     for (int16_t id=1; id<=NUM_WORKERS; id++) {
       WorkerNode workerNode;
       workerNode.workerID = id;
-      workerNode.workerIP = ip;
+      workerNode.workerIP = ip; // + to_string(wip[id-1]);
       workerNode.workerPort = port++;
 
       WorkerList.push_back(workerNode);
+      //wip++;
     }
 
-    Logger::instance().log(MSG+" Initializing accounts with 100000000000000000000000 wei to execute transactions starts", Logger::kLogLevelInfo);
+    //Logger::instance().log(MSG+" Initializing accounts with 100000000000000000000000 wei to execute transactions starts", Logger::kLogLevelInfo);
     
     string line;
     ifstream accounts_file ("data/bigquery/addresses.json");
@@ -433,7 +406,7 @@ class MasterServiceHandler : virtual public MasterServiceIf {
     }
     cout << "optimized accounts size " << dataItemMap.size() << endl;
     
-    Logger::instance().log(MSG+" Initializing accounts with 100000000000000000000000 wei to execute transactions ends", Logger::kLogLevelInfo);
+    //Logger::instance().log(MSG+" Initializing accounts with 100000000000000000000000 wei to execute transactions ends", Logger::kLogLevelInfo);
     
     std::ifstream ethereum_data_file(filename);
     ethereum_data_file >> ethereum_data;    
@@ -447,13 +420,26 @@ class MasterServiceHandler : virtual public MasterServiceIf {
   void processBlocks() {
     // open a file in write mode.
     ofstream e2efile;
-    e2efile.open(dir_path+"be_e2e_milli.csv",std::ofstream::out | std::ofstream::trunc);
+    e2efile.open(dir_path+"be_e2e.csv",std::ofstream::out | std::ofstream::trunc);
       
     ofstream txnfile;
-    txnfile.open(dir_path+"be_txn_milli.csv",std::ofstream::out | std::ofstream::trunc);
+    txnfile.open(dir_path+"be_txn.csv",std::ofstream::out | std::ofstream::trunc);
     
     ofstream minefile;
-    minefile.open(dir_path+"be_mine_milli.csv",std::ofstream::out | std::ofstream::trunc);  
+    minefile.open(dir_path+"be_mine.csv",std::ofstream::out | std::ofstream::trunc);  
+
+    ofstream valfile;
+    valfile.open(dir_path+"be_val.csv",std::ofstream::out | std::ofstream::trunc); 
+    
+    ofstream val2file;
+    val2file.open(dir_path+"be_val2.csv",std::ofstream::out | std::ofstream::trunc);
+
+    ofstream createfile;
+    createfile.open(dir_path+"be_create.csv",std::ofstream::out | std::ofstream::trunc); 
+    
+    ofstream analyzefile;
+    analyzefile.open(dir_path+"be_analyze.csv",std::ofstream::out | std::ofstream::trunc); 
+    
 
     // Your implementation goes here
     int64_t index = 0;
@@ -471,10 +457,13 @@ class MasterServiceHandler : virtual public MasterServiceIf {
       auto start = chrono::steady_clock::now();
       block.number = index++;
       block.prevHash = prevBlockHash;
-      if (block.number > 100 and mining) break;
+      if (block.number > 10 and mining) break;
 
       createBlock(data);
       
+      auto end1 = chrono::steady_clock::now();
+      createfile << chrono::duration_cast<chrono::microseconds>(end1 - start).count() << "\n";
+
 
       //if (block.number >= 5) break;
       cout << block.number << "\t" << block.transactionsList.size() << "\n";
@@ -487,14 +476,20 @@ class MasterServiceHandler : virtual public MasterServiceIf {
 
       if (block.transactionsList.size() > 0) {
         Logger::instance().log(MSG+" Block "+to_string(block.number)+" analyze starts", Logger::kLogLevelInfo);
+        sendTransactionMap.clear();
         analyze(block.transactionsList);
+        auto end2 = chrono::steady_clock::now();
+        analyzefile << chrono::duration_cast<chrono::microseconds>(end2 - start).count() << "\n";
         Logger::instance().log(MSG+" Block "+to_string(block.number)+" analyze ends", Logger::kLogLevelInfo);
+
+	      block.transactionsList.clear();
 
         //sendTransactions
         
         pthread_t threads[NUM_THREADS];
         pthread_attr_t attr;
-        struct thread_data td[NUM_THREADS];
+        //struct thread_data td[NUM_THREADS];
+        //struct thread_data *td = new(nothrow) struct thread_data[NUM_THREADS];
         int rc;
         int thID = 0;
         void *status;
@@ -504,16 +499,19 @@ class MasterServiceHandler : virtual public MasterServiceIf {
         pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
         for (auto const& worker : WorkerList) {
-          td[thID].threadID = thID;
-          td[thID].workerID = worker.workerID;
-          td[thID].workerIP = worker.workerIP;
-          td[thID].workerPort = worker.workerPort;
-          td[thID].number = block.number;
+	  //pthread_t threads;
+	        struct thread_data *td = new(nothrow) struct thread_data;
+          td->threadID = thID;
+          td->workerID = worker.workerID;
+          td->workerIP = worker.workerIP;
+          td->workerPort = worker.workerPort;
+          td->number = block.number;
 
           Logger::instance().log(MSG+" Block "+to_string(block.number)+" thread " + to_string(thID) +" starts", Logger::kLogLevelInfo); 
-          rc = pthread_create(&threads[thID], &attr, connectWorker, (void *)&td[thID]);
+          rc = pthread_create(&threads[thID], &attr, connectWorker, (void *)td);
           
           if (rc) {
+	           cout << "MS create failed" << endl;
              exit(-1);
           }
           thID = (thID+1) % NUM_THREADS;
@@ -525,72 +523,208 @@ class MasterServiceHandler : virtual public MasterServiceIf {
         for(int p = 0; p < NUM_THREADS; p++ ) {
           rc = pthread_join(threads[p], &status);
           if (rc) {
+	     cout << "MS join failed" << endl;
              exit(-1);
           }
-          Logger::instance().log(MSG+" Block "+to_string(block.number)+" thread " + to_string(td[thID].threadID) +" ends", Logger::kLogLevelInfo);
+          //Logger::instance().log(MSG+" Block "+to_string(block.number)+" thread " + to_string(td[thID].threadID) +" ends", Logger::kLogLevelInfo);
         }                                                                                                                                                                           
       }
 
-      auto end2 = chrono::steady_clock::now();
-      txnfile << chrono::duration_cast<chrono::milliseconds>(end2 - start).count() << "\n";
+      auto end3 = chrono::steady_clock::now();
+      txnfile << chrono::duration_cast<chrono::microseconds>(end3 - start).count() << "\n";
       //txnfile.close();
+
+      //cout << "txns size: " << block.transactionsList.size() << endl;
+
+      //block.finalDataItemMap = dataItemMap;
+      //cout << "block dataItemMap size: " << block.finalDataItemMap.size() << endl;
+      //block.sendTxnMap = sendTransactionMap;
+      //cout << "block sendTxnMap size: " << block.sendTxnMap.size() << endl;
+
 
       //Block prevBlock;
       // Mining starts
       if (mining) {
-        Logger::instance().log(MSG+" Block " + to_string(block.number) + " Block Mining starts", Logger::kLogLevelInfo);
+        //Logger::instance().log(MSG+" Block " + to_string(block.number) + " Block Mining starts", Logger::kLogLevelInfo);
         minerStatus = false;
         //string block_hash = "0000000000000000000000000000000000000000000000000000000000000000";
         cout << mining << endl;
         //string block_str = convert_block_to_string(prevBlock);
         //block.prevHash = sha256(block_str);
         //cout << "prev hash calculated" << endl;
+        cout << "Miner mineBlock starts" << endl;
+        
+	//bool[] flag = {0,0,0,0,0};
+	//while (!flag) {
+	//int count = 0;
         for (auto const& worker : WorkerList) {
-          std::shared_ptr<TTransport> socket(new TSocket(worker.workerIP, worker.workerPort));
+	  //if (miningStatus) break;
+	  //cout << worker.workerIP << " " << worker.workerPort << endl;
+        //cout << "Miner mineBlock starts" << endl;  
+        //int count = 0;
+	//while(1) {
+	 //count++;
+	 //cout << "trying to send"
+	  try {
+	  std::shared_ptr<TTransport> socket(new TSocket(worker.workerIP, worker.workerPort));
           std::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
           std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
           WorkerServiceClient workerClient(protocol);
           //Logger::instance().log(MSG+" Block "+to_string(block.number) +" connection to worker "+to_string(worker.workerID)+" starts", Logger::kLogLevelInfo);
           transport->open();
+		
           //Logger::instance().log(MSG+" Block "+to_string(block.number) +" WorkerID "+to_string(worker.workerID)+" mineBlock() starts", Logger::kLogLevelInfo);
           //printf("Sending transactionsList and LocalDataItemsMap to worker nodes\n");
+          //cout << "Miner mineBlock count:" << count << endl;
           workerClient.mineBlock(block,worker.workerID,NUM_WORKERS); // returns local worker response
           //Logger::instance().log(MSG+" Block "+to_string(block.number) +" WorkerID "+to_string(worker.workerID)+" mineBlock() ends", Logger::kLogLevelInfo);
-          
+          //std::this_thread::sleep_for(std::chrono::milliseconds(200));
           transport->close();
+	  //cout << "Miner mineBlock ends" << endl;
+	  //break;
+	  //std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	} catch (exception& e) {
+        	cout << "Mining Error: " << e.what() << endl;
+           }
+	}
+	
+	//cout << "Miner Block ends"
+	//std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        //
           //Logger::instance().log(MSG+" Block "+to_string(block.number) +" connection to worker "+to_string(worker.workerID)+" ends", Logger::kLogLevelInfo);
           //Logger::instance().log(MSG+" Block "+to_string(newBlock.number) +" thread "+ to_string(worker.workerID) +" ends", Logger::kLogLevelInfo);
-        }
+        //}
         //cout << "waiting starts" <<  endl;
+
+	cout << "Mining Block ends" << endl;
 
         cout << endl;
         while (!minerStatus) {
           cout << minerStatus;
           //bool status = minerStatus;
           //sleep(1);
-          std::this_thread::sleep_for(std::chrono::milliseconds(50));
+          std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
         cout << endl;
-        Logger::instance().log(MSG+" Block " + to_string(block.number) + " Block Mining ends", Logger::kLogLevelInfo);
+
+        //Logger::instance().log(MSG+" Block " + to_string(block.number) + " Block Mining ends", Logger::kLogLevelInfo);
 
       }
-      
+      //cout << "waiting ends" << endl;
       //prevBlock = block;
 
-      auto end3 = chrono::steady_clock::now();
-      minefile << chrono::duration_cast<chrono::milliseconds>(end3 - end2).count() << "\n";
+      auto end4 = chrono::steady_clock::now();
+      minefile << chrono::duration_cast<chrono::microseconds>(end4 - end3).count() << "\n";
       //txnfile.close();
       
-      Logger::instance().log(MSG+" Block "+to_string(block.number)+" clear_memory starts", Logger::kLogLevelInfo);
+
+      /*
+      for (auto tx: block.transactionsList) {
+	block.finalDataItemMap[tx.fromAddress] = dataItemMap[tx.fromAddress];
+	block.finalDataItemMap[tx.toAddress] = dataItemMap[tx.toAddress];
+	//block.finalDataItemMap[tx.creates] = dataItemMap[tx.creates];
+      }
+      //block.finalDataItemMap = dataItemMap;
+      //cout << "block dataItemMap size: " << block.finalDataItemMap.size() << endl;
+      for (auto it: sendTransactionMap) {
+	for (auto tx : it.second) {
+		block.sendTxnMap[it.first].push_back(tx.transactionID);
+	}
+	}*/
+      //block.sendTxnMap = sendTransactionMap;
+      //cout << "block sendTxnMap size: " << block.sendTxnMap.size() << endl;
+
+
+      //Logger::instance().log(MSG+" Block "+to_string(block.number)+" clear_memory starts", Logger::kLogLevelInfo);
+      //Logger::instance().log(MSG+" Block "+to_string(block.number)+" clear_memory ends", Logger::kLogLevelInfo);
+
+      auto end5 = chrono::steady_clock::now();
+      e2efile << chrono::duration_cast<chrono::microseconds>(end5 - start).count() << "\n";
+
+	/*
+	
+	//cout << "validation" << endl;
+      // Validation
+      std::shared_ptr<TTransport> socket(new TSocket(masterIP, masterPort));
+      std::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
+      std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
+      MasterValidationClient masterValidator(protocol);
+
+      //Logger::instance().log(MSG+" Block "+to_string(block.number) +" connection to master "+WID+" starts", Logger::kLogLevelInfo);
+     // while (1) {
+          //try {
+                transport->open();
+           //     break;
+          //} catch (exception& e) {
+            //    cout << "Val Error: " << e.what() << endl;
+          //}
+          //}
+
+
+      //Logger::instance().log(MSG+" Block "+to_string(block.number) +" worker "+WID+" mineBlock() starts", Logger::kLogLevelInfo);
+
+      // sent transaction to execute     
+      
+      // without sharing info
+      cout << "validateBlock starts" << endl;
+      cout << block.number << "\t" << block.transactionsList.size() << endl; 
+      masterValidator.validateBlock(block); 
+
+      cout << "validateBlock ends" << endl;
+
+      //Logger::instance().log(MSG+" Block "+to_string(block.number) +" WorkerID "+WID+" mineBlock() ends", Logger::kLogLevelInfo);
+      
+      transport->close();
+      //Logger::instance().log(MSG+" Block "+to_string(block.number) +" connection to master "+WID+" ends", Logger::kLogLevelInfo);
+
+      auto end5 = chrono::steady_clock::now();
+      valfile << chrono::duration_cast<chrono::microseconds>(end5 - end4).count() << "\n";
+
+      // with sharing info      
+
+      std::shared_ptr<TTransport> socket2(new TSocket(masterIP, masterPort2));
+      std::shared_ptr<TTransport> transport2(new TBufferedTransport(socket2));
+      std::shared_ptr<TProtocol> protocol2(new TBinaryProtocol(transport2));
+      MasterValidationClient masterValidator2(protocol2);
+
+      //Logger::instance().log(MSG+" Block "+to_string(block.number) +" connection to master "+WID+" starts", Logger::kLogLevelInfo);
+      //while (1) {
+      //    try {
+                transport2->open();
+       //         break;
+        //  } catch (exception& e) {
+          //      cout << "Val2 Error: " << e.what() << endl;
+         // }
+          //}
+
+
+      //Logger::instance().log(MSG+" Block "+to_string(block.number) +" worker "+WID+" mineBlock() starts", Logger::kLogLevelInfo);
+
+      // sent transaction to execute     
+      
+      // with sharing info
+      cout << "validateBlockWithInfo starts" << endl;
+      cout << "size at master: " << block.sendTxnMap.size() << endl;
+      masterValidator2.validateBlockWithInfo(block);
+      cout << "size at master after execution: " << block.sendTxnMap.size() << endl;
+	cout << "validateBlockWithInfo ends" << endl;
+      // with sharing info
+
+      //Logger::instance().log(MSG+" Block "+to_string(block.number) +" WorkerID "+WID+" mineBlock() ends", Logger::kLogLevelInfo);
+      
+      transport2->close();
+      
+
+      auto end6 = chrono::steady_clock::now();
+      val2file << chrono::duration_cast<chrono::microseconds>(end6 - end5).count() << "\n";
+
+	*/
+      
+
       clear_memory(); 
-      Logger::instance().log(MSG+" Block "+to_string(block.number)+" clear_memory ends", Logger::kLogLevelInfo);
+      
 
-      auto end4 = chrono::steady_clock::now();
-      e2efile << chrono::duration_cast<chrono::milliseconds>(end4 - start).count() << "\n";
-
-
-
-
+      //std::this_thread::sleep_for(std::chrono::milliseconds(1000));
       //e2efile.close(); 
 
       /*
@@ -608,6 +742,7 @@ class MasterServiceHandler : virtual public MasterServiceIf {
   //4: optional map<string,string> file3; // owner file <filename, owner name>
 }
       */
+      /*
       if (block.number % 100 == 0) {
         ofstream nextState;
         if (NUM_WORKERS == 1)
@@ -639,32 +774,38 @@ class MasterServiceHandler : virtual public MasterServiceIf {
         }
         nextState.close();
       
-      }
+      }*/
 
     }
     
     txnfile.close();
     e2efile.close();
+    minefile.close();
+    createfile.close();
+    analyzefile.close();
+  
       
   }
 
   void recvMiningStatus(const int64_t nonce, const int32_t number) {
     // Your implementation goes here
 
-    Logger::instance().log("Block " + to_string(block.number) + " recvMiningStatus starts ", Logger::kLogLevelInfo);
+    //Logger::instance().log("Block " + to_string(block.number) + " recvMiningStatus starts ", Logger::kLogLevelInfo);
     //cout << "\n" << newBlock.number << "\t" << number << "\t" << minerStatus << endl;
 
     if (block.number == number && !minerStatus) {
-      block.nonce = nonce;
+      minerStatus = true;
+	block.nonce = nonce;
       
       string block_str = convert_block_to_string(block);
       prevBlockHash = sha256(block_str);
       //cout << nonce << "\t" << block_hash << endl;
 
-      minerStatus = true;
+      //minerStatus = true;
     }
+    //cout << "nonce at master: " << block.nonce << endl;
     
-    Logger::instance().log("Block " + to_string(block.number) + " recvMiningStatus ends ", Logger::kLogLevelInfo);
+    //Logger::instance().log("Block " + to_string(block.number) + " recvMiningStatus ends ", Logger::kLogLevelInfo);
     
     //printf("recvMiningStatus\n");
   }
@@ -672,7 +813,7 @@ class MasterServiceHandler : virtual public MasterServiceIf {
 };
 
 int main(int argc, char **argv) {
-  Logger::instance().log(MSG+" starts", Logger::kLogLevelInfo);
+  //Logger::instance().log(MSG+" starts", Logger::kLogLevelInfo);
   
   int port = atoi(argv[1]);
   NUM_THREADS = atoi(argv[2]);
@@ -693,15 +834,15 @@ int main(int argc, char **argv) {
   threadManager->threadFactory(threadFactory);
   threadManager->start();
   
-  Logger::instance().log(MSG+" creating TThreadPoolServer connection", Logger::kLogLevelInfo);
+  //Logger::instance().log(MSG+" creating TThreadPoolServer connection", Logger::kLogLevelInfo);
   //TNonblockingServer server(processor, protocolFactory, nbServerTransport, threadManager);
   
   //TSimpleServer 
   TThreadPoolServer server(processor, serverTransport, transportFactory, protocolFactory, threadManager);
-  Logger::instance().log(MSG+" connection established", Logger::kLogLevelInfo);
+  //Logger::instance().log(MSG+" connection established", Logger::kLogLevelInfo);
   
-  Logger::instance().log(MSG+" service starts", Logger::kLogLevelInfo);
+  //Logger::instance().log(MSG+" service starts", Logger::kLogLevelInfo);
   server.serve();
-  Logger::instance().log(MSG+" service ends", Logger::kLogLevelInfo);
+  //Logger::instance().log(MSG+" service ends", Logger::kLogLevelInfo);
   return 0;
 }

@@ -5,6 +5,7 @@ include "SharedService.thrift"
 namespace cpp MasterService
 
 // declare data structures
+/*
 struct MasterNode {
 	1: required i16 masterID;
 	2: required string masterIP;
@@ -19,7 +20,7 @@ struct Block {
 	5: required list<SharedService.Transaction> transactionsList;
 	6: optional list<SharedService.Uncle> unclesList;
 }
-
+*/
 
 
 // declare services used by workers and clients

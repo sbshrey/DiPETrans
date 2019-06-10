@@ -56,16 +56,16 @@ public:
   //double _totalSupply(DataItem* dataItem);
   //double balanceOf(DataItem* dataItem, string _owner);
   bool transfer(DataItem* dataItem, string _sender, string _to, double _value);
-  bool transferFrom(DataItem* dataItem, string _from, string _to, double _value);
+  //bool transferFrom(DataItem* dataItem, string _from, string _to, double _value);
   bool approve(DataItem* dataItem, string _sender, string _spender, double _value);
-  double allowance(DataItem* dataItem, string _owner, string _spender);
-  void deposit(DataItem* dataItem);
-  void depositToken(DataItem* dataItem, string token, double amount);
-  void withdraw(DataItem* dataItem, double amount);
-  void withdrawToken(DataItem* dataItem, string token, double amount);
+  //double allowance(DataItem* dataItem, string _owner, string _spender);
+  //void deposit(DataItem* dataItem);
+  //void depositToken(DataItem* dataItem, string token, double amount);
+  //void withdraw(DataItem* dataItem, double amount);
+  //void withdrawToken(DataItem* dataItem, string token, double amount);
   
   void vote(DataItem* dataItem, int64_t _tokenIndex);
-  void transferOwnership(DataItem* dataItem, string address);
+  //void transferOwnership(DataItem* dataItem, string address);
   void submitTransaction(DataItem* dataItem, string _sender, string _address, double _amount, string _data);
   void issue(DataItem* dataItem, string _to, double _amount);
   void playerRollDice(DataItem* dataItem, string _sender, int64_t _rollUnder);
@@ -157,14 +157,14 @@ void ERC20::vote(DataItem* dataItem, int64_t _tokenIndex) {
 	}
 }
 
-
+/*
 void ERC20::transferOwnership(DataItem* dataItem, string newOwner) {
 	if (newOwner != dataItem->owner) {
 		dataItem->owner = newOwner;
 
 	}
 }
-
+*/
 void ERC20::submitTransaction(DataItem* dataItem, string _sender, string _address, double _amount, string _data) {
 	Transaction transaction;
 	transaction.fromAddress = _sender;
@@ -403,11 +403,11 @@ void call_contract(DataItem *dataItem, string contractAddress, string senderAddr
 		  }
 		  */
 		  cout << "vote executed" << endl;
-		} else if (fxHash.compare("0xf2fde38b") == 0)
+		} /*else if (fxHash.compare("0xf2fde38b") == 0)
 		{
 		  // https://etherscan.io/address/0x2b2d7d874bbfb73f85b2f8a9ee0d9f3e93722622#code
 
-		  /*
+		  
 
 		  function transferOwnership(address newOwner) onlyOwner {
 		      if (newOwner != address(0)) {
@@ -415,13 +415,13 @@ void call_contract(DataItem *dataItem, string contractAddress, string senderAddr
 		      }
 		    }
 
-		  */
+		  
 		  //cout << "transferOwnership executes" << endl;
 		  string address = "0x" + input.substr(10,64);
 		  address.erase(2, min(address.find_first_not_of("0"), address.size()-1));
 		  tc->transferOwnership(dataItem, address);
 		  cout << "transferOwnership executed" << endl;
-		} else if (fxHash.compare("0xc6427474") == 0)
+		}*/ else if (fxHash.compare("0xc6427474") == 0)
 		{
 		  // https://medium.com/hellogold/ethereum-multi-signature-wallets-77ab926ab63b
 		  // function submitTransaction(address destination, uint value, bytes data)

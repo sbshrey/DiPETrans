@@ -26,7 +26,7 @@ for i in [1,2,4,8,16]:
 
 	print "Running for differnt worker configurations"
 
-	for j in [0,1,2,3,4,5]:
+	for j in [4,5]:
 		print
 		processes = []
 		if j == 0:

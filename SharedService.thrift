@@ -1,5 +1,6 @@
 namespace cpp SharedService
 
+
 struct Transaction {
 	1: required i64 transactionID;
 	2: required string fromAddress;
@@ -71,11 +72,18 @@ struct DataItem {
 struct WorkerResponse {
 	1: required map<string,DataItem> dataItemMap;
 	2: required list<i16> transactionIDList;
-	3: required list<string> contractAddresses;
+	3: required set<string> contractAddresses;
 }
 
 
-
+struct Block {
+    1: required i32 number;
+    2: required i64 nonce;
+    3: required string prevHash;
+    4: required list<Transaction> transactionsList;
+    5: required map<string,DataItem> finalDataItemMap;
+    6: required map<i16,list<Transaction>> sendTxnMap;
+}
 
 service SharedService {
 	

@@ -13,6 +13,8 @@ service WorkerService extends SharedService.SharedService {
 	// void recvDataItemsMap(1: map<string,i64> DataItemsMap);
 
 	SharedService.WorkerResponse recvTransactions(1: list<SharedService.Transaction> TransactionsList, 2: map<string, SharedService.DataItem> dataItemMap, 3: set<string> contractAddresses);
+        SharedService.WorkerResponse recvValTransactions(1: list<SharedService.Transaction> TransactionsList, 2: map<string, SharedService.DataItem> dataItemMap, 3: set<string> contractAddresses);
+        SharedService.WorkerResponse recvVal2Transactions(1: list<SharedService.Transaction> TransactionsList, 2: map<string, SharedService.DataItem> dataItemMap, 3: set<string> contractAddresses);
 
-	oneway void mineBlock(1: SharedService.Block block, 2: i64 nonce, 3: i16 interval);
+	void mineBlock(1: SharedService.Block block, 2: i64 nonce, 3: i16 interval);
 }

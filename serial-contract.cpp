@@ -221,19 +221,13 @@ int main(int argc, char const *argv[])
     cttfile.open(dir_path+"be_ctt.csv",std::ofstream::out | std::ofstream::trunc);
 
     ofstream e2efile;
-    e2efile.open(dir_path+"be_e2e.csv",std::ofstream::out | std::ofstream::trunc);
+    e2efile.open(dir_path+"be_e2e_milli.csv",std::ofstream::out | std::ofstream::trunc);
 
     ofstream txnfile;
-    txnfile.open(dir_path+"be_txn.csv",std::ofstream::out | std::ofstream::trunc);
+    txnfile.open(dir_path+"be_txn_milli.csv",std::ofstream::out | std::ofstream::trunc);
 
     ofstream minefile;
-    minefile.open(dir_path+"be_mine.csv",std::ofstream::out | std::ofstream::trunc);
-
-    ofstream createfile;
-    createfile.open(dir_path+"be_create.csv",std::ofstream::out | std::ofstream::trunc); 
-    
-    ofstream analyzefile;
-    analyzefile.open(dir_path+"be_analyze.csv",std::ofstream::out | std::ofstream::trunc);
+    minefile.open(dir_path+"be_mine_milli.csv",std::ofstream::out | std::ofstream::trunc);
 
     //ofstream scfile;
     //scfile.open(dir_path+"sc_call.csv",std::ofstream::out | std::ofstream::app);
@@ -266,14 +260,12 @@ int main(int argc, char const *argv[])
   		block.prevHash = prevBlockHash;
   		block.nonce = 0;
   		//cout << mining << endl;
-  		if (block.number > 10 and mining) break;
+  		if (block.number > 100 and mining) break;
   		//cout << typeid(data).name() << endl;
   		//cout << (*data)["transactions"].size() << "\t";// << data.value()["transactions"].size() << endl;
   		//break;
 	    createBlock(data);
-
-	    auto end1 = chrono::steady_clock::now();
-      	createfile << chrono::duration_cast<chrono::microseconds>(end1 - start).count() << "\n";
+	    
 	    
 	    //if (block.number >= 5) break;
 	    
@@ -360,7 +352,7 @@ int main(int argc, char const *argv[])
 		}
 
 		auto end2 = chrono::steady_clock::now();
-      	txnfile << chrono::duration_cast<chrono::microseconds>(end2 - start).count() << "\n";
+      	txnfile << chrono::duration_cast<chrono::milliseconds>(end2 - start).count() << "\n";
 
 		//cout << "success: " << successful_transactions << endl;
 		//cout << "failed " << failed_transactions << endl;
@@ -391,7 +383,7 @@ int main(int argc, char const *argv[])
 	    	//blockchain.push_back(block);
 	    	//Logger::instance().log("Block " + to_string(block.number) + " Block Mining ends", Logger::kLogLevelInfo);
 	    	auto end3 = chrono::steady_clock::now();
-      		minefile << chrono::duration_cast<chrono::microseconds>(end3 - end2).count() << "\n";
+      		minefile << chrono::duration_cast<chrono::milliseconds>(end3 - end2).count() << "\n";
     	}
     	
 
@@ -400,7 +392,7 @@ int main(int argc, char const *argv[])
 		//Logger::instance().log(MSG+" Block "+to_string(block.number)+" clear_memory ends", Logger::kLogLevelInfo);
 
 		auto end4 = chrono::steady_clock::now();
-		e2efile << chrono::duration_cast<chrono::microseconds>(end4 - start).count() << "\n";
+		e2efile << chrono::duration_cast<chrono::milliseconds>(end4 - start).count() << "\n";
 
 		/*if (block.number % 100 == 0) {
 			ofstream nextState;
@@ -437,8 +429,6 @@ int main(int argc, char const *argv[])
 	nttfile.close();
 	cttfile.close();
 	e2efile.close();
-	createfile.close();
-	analyzefile.close();
 	//scfile.close();
 
 	//Logger::instance().log("Serial Execution ends", Logger::kLogLevelInfo);

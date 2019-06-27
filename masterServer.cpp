@@ -87,16 +87,34 @@ string difficulty = "00011111111111111111111111111111111111111111111111111111111
 bool mining = false;
 
 vector<WorkerNode> WorkerList;
+vector<WorkerNode> ValWorkerList;
 
 vector<Transaction> txnsList;
+
+vector<Transaction> valTxnsList;
+
 
 map<string,DataItem> dataItemMap;
 map<int16_t, map<set<string>,set<int16_t>>> GlobalConflictsMap; // map<list<addresses>, list<txid>>
 map<string,list<int16_t>> LocalConflictsMap; // map<address,list<txid>>
 
+map<string,DataItem> valDataItemMap;
+map<int16_t, map<set<string>,set<int16_t>>> valGlobalConflictsMap; // map<list<addresses>, list<txid>>
+map<string,list<int16_t>> valLocalConflictsMap; // map<address,list<txid>>
+
+map<string,DataItem> val2DataItemMap;
+
+
+
 map<int16_t,std::vector<WorkerResponse>> GlobalWorkerResponsesList;
 
 map<string,list<string>> AdjacencyMap;
+
+map<int16_t,std::vector<WorkerResponse>> valGlobalWorkerResponsesList;
+
+map<string,list<string>> valAdjacencyMap;
+
+
 
 
 // object to store json ethereum blocks data
@@ -106,12 +124,12 @@ int NUM_WORKERS = 5;
 int NUM_THREADS = 5;
 
 int masterPort = 10090;
-//string masterIP = "192.168.0.17";
-string masterIP = "localhost";
+string masterIP = "192.168.0.17";
+//string masterIP = "localhost";
 
 int masterPort2 = 11090;
-//string masterIP2 = "192.168.0.17";
-string masterIP2 = "localhost";
+string masterIP2 = "192.168.0.17";
+//string masterIP2 = "localhost";
 
 //pthread_t global_threads[10];
 
@@ -133,6 +151,13 @@ struct thread_data {
 map<int16_t,vector<Transaction>> sendTransactionMap;
 map<int16_t, set<int16_t>> ccTransactionMap;
 set<string> contractAddresses;
+
+
+map<int16_t,vector<Transaction>> valSendTransactionMap;
+map<int16_t, set<int16_t>> valccTransactionMap;
+set<string> valContractAddresses;
+set<string> val2ContractAddresses;
+
 
 
 string convert_block_to_string(Block block) {
@@ -174,8 +199,8 @@ void createBlock(json::iterator data) {
 }
 
 // Clears memory of global data structures after every block creation
-void clear_memory() {
-  //sendTransactionMap.clear();
+void clear_memory_miner() {
+  sendTransactionMap.clear();
   ccTransactionMap.clear();
   GlobalConflictsMap.clear();
   LocalConflictsMap.clear();
@@ -186,6 +211,19 @@ void clear_memory() {
   block.sendTxnMap.clear();
   txnsList.clear();
 }
+
+void clear_memory_val() {
+  valSendTransactionMap.clear();
+  valccTransactionMap.clear();
+  valGlobalConflictsMap.clear();
+  valLocalConflictsMap.clear();
+  valGlobalWorkerResponsesList.clear();
+  valAdjacencyMap.clear();
+  block.transactionsList.clear();
+  block.finalDataItemMap.clear();
+  block.sendTxnMap.clear();
+  valTxnsList.clear();
+} 
 
 
 
@@ -205,13 +243,13 @@ void DFSUtil (int ccID, string v, map<string,bool> &visited) {
   }
 }
 
+
+
 // Creates graph and starts search for identifying connected components
 // Connected components are considered as dependent transactions club together
 // and are executed serially on the workers
 void analyze(vector<Transaction> TransactionList) {
   std::set<string> AddressList;
-
-  //Logger::instance().log(MSG+" AdjacencyMap starts", Logger::kLogLevelInfo);
   for (auto const& tx: TransactionList) {
     txnsList.push_back(tx);
     LocalConflictsMap[tx.fromAddress].push_back(tx.transactionID);
@@ -230,11 +268,9 @@ void analyze(vector<Transaction> TransactionList) {
     AddressList.insert(tx.fromAddress);
     
   }
-  //Logger::instance().log(MSG+" AdjacencyMap ends", Logger::kLogLevelInfo);
 
   map<string,bool> visited;
 
-  // Mark all vertices as not visited
   for (auto const& address: AddressList) {
     visited[address] = false;
   }
@@ -245,19 +281,14 @@ void analyze(vector<Transaction> TransactionList) {
 
   for (auto const& address: AddressList) {
     if (visited[address] == false) {
-      // print all reachable vertices
       DFSUtil(ccID,address,visited);
       
-      // Creation of Map to send dependent transactions to workers
-      // Load balanced ny identifying the least loaded worker and 
-      // appended the next connected components transactions to that worker
-
       if (ccTransactionMap[ccID].size() > 0) {
         for (auto const& txid: ccTransactionMap[ccID]) {
-          // load balancing across workers 
-          
-          sendTransactionMap[WorkerList[id].workerID].push_back(TransactionList[txid]);
+         sendTransactionMap[WorkerList[id].workerID].push_back(TransactionList[txid]);
         }
+	
+	
 
         if (ccID >= 5) {
           map<int16_t,vector<Transaction>>::iterator it1;
@@ -279,8 +310,96 @@ void analyze(vector<Transaction> TransactionList) {
       }
     }
   }
-  //cout << "Connected components\t" << ccTransactionMap.size() << endl; 
 }
+
+
+void valDFSUtil (int ccID, string v, map<string,bool> &visited) {
+  // Mark the current node as visited and print it
+  visited[v] = true;
+  for (auto const& tx: valLocalConflictsMap[v])
+    valccTransactionMap[ccID].insert(tx);
+  // Recur for all vertices
+  // adjacent to this vertex
+  
+  for (auto const& vc: valAdjacencyMap[v]) {
+    if (visited[vc] == false) {
+      valDFSUtil(ccID,vc,visited);
+    }
+  }
+}
+
+
+
+
+void valAnalyze(vector<Transaction> TransactionList) {
+  std::set<string> AddressList;
+  for (auto const& tx: TransactionList) {
+    valTxnsList.push_back(tx);
+    valLocalConflictsMap[tx.fromAddress].push_back(tx.transactionID);
+    if (tx.toAddress == "creates") {
+      valLocalConflictsMap[tx.creates].push_back(tx.transactionID);
+      valAdjacencyMap[tx.creates].push_back(tx.fromAddress); 
+      AddressList.insert(tx.creates);
+      valAdjacencyMap[tx.fromAddress].push_back(tx.creates);
+    } else {
+      valLocalConflictsMap[tx.toAddress].push_back(tx.transactionID);
+      valAdjacencyMap[tx.toAddress].push_back(tx.fromAddress);
+      AddressList.insert(tx.toAddress);
+      valAdjacencyMap[tx.fromAddress].push_back(tx.toAddress);
+    }
+    
+    AddressList.insert(tx.fromAddress);
+    
+  }
+
+  map<string,bool> visited;
+
+  for (auto const& address: AddressList) {
+    visited[address] = false;
+  }
+
+  int ccID = 1;
+  int id = 0;
+  int minID = 0;
+
+  for (auto const& address: AddressList) {
+    if (visited[address] == false) {
+      valDFSUtil(ccID,address,visited);
+      
+      if (valccTransactionMap[ccID].size() > 0) {
+        for (auto const& txid: ccTransactionMap[ccID]) {
+         valSendTransactionMap[WorkerList[id].workerID].push_back(TransactionList[txid]);
+        }
+	
+	
+
+        if (ccID >= 5) {
+          map<int16_t,vector<Transaction>>::iterator it1;
+          map<int16_t,vector<Transaction>>::iterator it2;
+          for (it1 = valSendTransactionMap.begin(); it1 != valSendTransactionMap.end(); ++it1)
+          {
+            for (it2 = valSendTransactionMap.begin() ; it2 != valSendTransactionMap.end(); ++it2)
+            {
+              if (it1->second.size() > it2->second.size()) {
+                id = it2->first - 1;
+              }
+            }
+          }
+        } else {
+          id = (id+1)%NUM_WORKERS;
+        }
+
+        ccID++;
+      }
+    }
+  }
+}
+
+
+
+
+
+
 
 /*
 bool fileExists(const std::string& file) {
@@ -298,9 +417,9 @@ void *connectWorker (void *threadarg) {
   struct thread_data *worker;
   worker = (struct thread_data *) threadarg;
 
-  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" thread "+ to_string(worker->workerID) +" starts", Logger::kLogLevelInfo);
+  Logger::instance().log(MSG+" Block "+to_string(worker->number) +" thread "+ to_string(worker->workerID) +" starts", Logger::kLogLevelInfo);
       
-
+	/*
   std::shared_ptr<TTransport> socket(new TSocket(worker->workerIP, worker->workerPort));
   std::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
   std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
@@ -308,7 +427,7 @@ void *connectWorker (void *threadarg) {
 
   //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" connection to worker "+to_string(worker->workerID)+" starts", Logger::kLogLevelInfo);
   transport->open();
-
+	*/
   //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" localDataItemMap generation for worker "+to_string(worker->workerID)+" starts", Logger::kLogLevelInfo);
   
   // Creates data items map of address which are going to be modified by the transactions sent to worker
@@ -325,17 +444,29 @@ void *connectWorker (void *threadarg) {
   }
 
 
+  std::shared_ptr<TTransport> socket(new TSocket(worker->workerIP, worker->workerPort));
+  std::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
+  std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
+  WorkerServiceClient workerClient(protocol);
+
+  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" connection to worker "+to_string(worker->workerID)+" starts", Logger::kLogLevelInfo);
+    transport->open();
+
 
   //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" localDataItemMap generation for worker "+to_string(worker->workerID)+" ends", Logger::kLogLevelInfo);
   
   //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" WorkerID "+to_string(worker->workerID)+" recvTransactions() starts", Logger::kLogLevelInfo);
 
   WorkerResponse localWorkerResponse;
-  
-  workerClient.recvTransactions(localWorkerResponse,sendTransactionMap[worker->workerID],localDataItemMap, contractAddresses); // returns local worker response
+  try{
+  	workerClient.recvTransactions(localWorkerResponse,sendTransactionMap[worker->workerID],localDataItemMap, contractAddresses); // returns local worker response
+  } catch (exception& e)
+  {
+    cout << "Error in connect worker" << e.what()  << '\n';
+  }
   cout << worker->threadID << ":" << sendTransactionMap[worker->workerID].size() << ":" << localWorkerResponse.dataItemMap.size() << "\n";
   //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" WorkerID "+to_string(worker->workerID)+" recvTransactions() ends", Logger::kLogLevelInfo);
-  
+  transport->close();
 
   //cout << "WR dataItemMap" << endl;
   for (auto it :localWorkerResponse.dataItemMap)
@@ -343,21 +474,196 @@ void *connectWorker (void *threadarg) {
     dataItemMap[it.first] = it.second;
   }
   //cout << "WR txnsList" << endl;
-
+/*
   for (auto it : localWorkerResponse.transactionIDList) {
     //cout << "txid: " << it << endl;
     block.transactionsList.push_back(txnsList[it]);
   }
-
+*/
   //cout << "WR cntrctAddr" << endl;
   for (auto it :localWorkerResponse.contractAddresses)
   {
     contractAddresses.insert(it);
   }
 
-  transport->close();
+ // transport->close();
   //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" connection to worker "+to_string(worker->workerID)+" ends", Logger::kLogLevelInfo);
-  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" thread "+ to_string(worker->workerID) +" ends", Logger::kLogLevelInfo);
+  Logger::instance().log(MSG+" Block "+to_string(worker->number) +" thread "+ to_string(worker->workerID) +" ends", Logger::kLogLevelInfo);
+      
+
+  delete worker;
+
+  pthread_exit(&worker->threadID);
+}
+
+
+
+void *connectValWorker (void *threadarg) {
+  //map< string,double> LocalDataItemMap;
+  
+
+  struct thread_data *worker;
+  worker = (struct thread_data *) threadarg;
+
+  Logger::instance().log(MSG+" Block "+to_string(worker->number) +" val_thread "+ to_string(worker->workerID) +" starts", Logger::kLogLevelInfo);
+      
+	/*
+  std::shared_ptr<TTransport> socket(new TSocket(worker->workerIP, worker->workerPort));
+  std::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
+  std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
+  WorkerServiceClient workerClient(protocol);
+
+  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" connection to worker "+to_string(worker->workerID)+" starts", Logger::kLogLevelInfo);
+  transport->open();
+	*/
+  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" localDataItemMap generation for worker "+to_string(worker->workerID)+" starts", Logger::kLogLevelInfo);
+  
+  // Creates data items map of address which are going to be modified by the transactions sent to worker
+  // instead of sending complete map of addresses
+
+  map<string,DataItem> localDataItemMap;
+  for (auto& tx: valSendTransactionMap[worker->workerID]) {
+    // add code to get the current state of contract  
+
+    localDataItemMap[tx.fromAddress] = valDataItemMap[tx.fromAddress];
+    localDataItemMap[tx.toAddress] = valDataItemMap[tx.toAddress];
+
+
+  }
+
+
+  std::shared_ptr<TTransport> socket(new TSocket(worker->workerIP, worker->workerPort));
+  std::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
+  std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
+  WorkerServiceClient workerClient(protocol);
+
+  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" connection to worker "+to_string(worker->workerID)+" starts", Logger::kLogLevelInfo);
+    transport->open();
+
+
+  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" localDataItemMap generation for worker "+to_string(worker->workerID)+" ends", Logger::kLogLevelInfo);
+  
+  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" WorkerID "+to_string(worker->workerID)+" recvTransactions() starts", Logger::kLogLevelInfo);
+
+  WorkerResponse localWorkerResponse;
+  try{
+  	workerClient.recvValTransactions(localWorkerResponse,valSendTransactionMap[worker->workerID],localDataItemMap, valContractAddresses); // returns local worker response
+  } catch (exception& e)
+  {
+    cout << "Error in connect val worker" << e.what()  << '\n';
+  }
+  cout << worker->threadID << ":" << valSendTransactionMap[worker->workerID].size() << ":" << localWorkerResponse.dataItemMap.size() << "\n";
+  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" WorkerID "+to_string(worker->workerID)+" recvTransactions() ends", Logger::kLogLevelInfo);
+  transport->close();
+
+  //cout << "WR dataItemMap" << endl;
+  for (auto it :localWorkerResponse.dataItemMap)
+  {
+    valDataItemMap[it.first] = it.second;
+  }
+  //cout << "WR txnsList" << endl;
+/*
+  for (auto it : localWorkerResponse.transactionIDList) {
+    //cout << "txid: " << it << endl;
+    block.transactionsList.push_back(txnsList[it]);
+  }
+*/
+  //cout << "WR cntrctAddr" << endl;
+  for (auto it :localWorkerResponse.contractAddresses)
+  {
+    valContractAddresses.insert(it);
+  }
+
+ // transport->close();
+  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" connection to worker "+to_string(worker->workerID)+" ends", Logger::kLogLevelInfo);
+  Logger::instance().log(MSG+" Block "+to_string(worker->number) +" val_thread "+ to_string(worker->workerID) +" ends", Logger::kLogLevelInfo);
+      
+
+  delete worker;
+
+  pthread_exit(&worker->threadID);
+}
+
+
+void *connectVal2Worker (void *threadarg) {
+  //map< string,double> LocalDataItemMap;
+  
+
+  struct thread_data *worker;
+  worker = (struct thread_data *) threadarg;
+
+  Logger::instance().log(MSG+" Block "+to_string(worker->number) +" val2_thread "+ to_string(worker->workerID) +" starts", Logger::kLogLevelInfo);
+      
+	/*
+  std::shared_ptr<TTransport> socket(new TSocket(worker->workerIP, worker->workerPort));
+  std::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
+  std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
+  WorkerServiceClient workerClient(protocol);
+
+  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" connection to worker "+to_string(worker->workerID)+" starts", Logger::kLogLevelInfo);
+  transport->open();
+	*/
+  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" localDataItemMap generation for worker "+to_string(worker->workerID)+" starts", Logger::kLogLevelInfo);
+  
+  // Creates data items map of address which are going to be modified by the transactions sent to worker
+  // instead of sending complete map of addresses
+
+  map<string,DataItem> localDataItemMap;
+  for (auto& tx: sendTransactionMap[worker->workerID]) {
+    // add code to get the current state of contract  
+
+    localDataItemMap[tx.fromAddress] = val2DataItemMap[tx.fromAddress];
+    localDataItemMap[tx.toAddress] = val2DataItemMap[tx.toAddress];
+
+
+  }
+
+
+  std::shared_ptr<TTransport> socket(new TSocket(worker->workerIP, worker->workerPort));
+  std::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
+  std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
+  WorkerServiceClient workerClient(protocol);
+
+  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" connection to worker "+to_string(worker->workerID)+" starts", Logger::kLogLevelInfo);
+    transport->open();
+
+
+  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" localDataItemMap generation for worker "+to_string(worker->workerID)+" ends", Logger::kLogLevelInfo);
+  
+  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" WorkerID "+to_string(worker->workerID)+" recvTransactions() starts", Logger::kLogLevelInfo);
+
+  WorkerResponse localWorkerResponse;
+  try{
+  	workerClient.recvVal2Transactions(localWorkerResponse,sendTransactionMap[worker->workerID],localDataItemMap, val2ContractAddresses); // returns local worker response
+  } catch (exception& e)
+  {
+    cout << "Error in connect val worker" << e.what()  << '\n';
+  }
+  cout << worker->threadID << ":" << sendTransactionMap[worker->workerID].size() << ":" << localWorkerResponse.dataItemMap.size() << "\n";
+  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" WorkerID "+to_string(worker->workerID)+" recvTransactions() ends", Logger::kLogLevelInfo);
+  transport->close();
+
+  //cout << "WR dataItemMap" << endl;
+  for (auto it :localWorkerResponse.dataItemMap)
+  {
+    val2DataItemMap[it.first] = it.second;
+  }
+  //cout << "WR txnsList" << endl;
+/*
+  for (auto it : localWorkerResponse.transactionIDList) {
+    //cout << "txid: " << it << endl;
+    block.transactionsList.push_back(txnsList[it]);
+  }
+*/
+  //cout << "WR cntrctAddr" << endl;
+  for (auto it :localWorkerResponse.contractAddresses)
+  {
+    val2ContractAddresses.insert(it);
+  }
+
+ // transport->close();
+  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" connection to worker "+to_string(worker->workerID)+" ends", Logger::kLogLevelInfo);
+  Logger::instance().log(MSG+" Block "+to_string(worker->number) +" val2_thread "+ to_string(worker->workerID) +" ends", Logger::kLogLevelInfo);
       
 
   delete worker;
@@ -368,14 +674,15 @@ void *connectWorker (void *threadarg) {
 
 
 
+
 class MasterServiceHandler : virtual public MasterServiceIf {
  public:
   MasterServiceHandler() {
     // Your initialization goes here
     
     int16_t port = 8091;
-    //string ip = "192.168.0.";
-    string ip = "localhost";
+    string ip = "192.168.0.";
+    //string ip = "localhost";
 
     //vector<string> masterIPList;
 
@@ -384,7 +691,7 @@ class MasterServiceHandler : virtual public MasterServiceIf {
     for (int16_t id=1; id<=NUM_WORKERS; id++) {
       WorkerNode workerNode;
       workerNode.workerID = id;
-      workerNode.workerIP = ip; // + to_string(wip[id-1]);
+      workerNode.workerIP = ip + to_string(wip[id-1]);
       workerNode.workerPort = port++;
 
       WorkerList.push_back(workerNode);
@@ -403,6 +710,8 @@ class MasterServiceHandler : virtual public MasterServiceIf {
     for (json::iterator it = accounts.begin(); it != accounts.end(); ++it) {
       if (it.value().get<double>() != 0)
         dataItemMap[it.key()].value =  it.value().get<double>();
+	valDataItemMap[it.key()].value =  it.value().get<double>();
+	val2DataItemMap[it.key()].value =  it.value().get<double>();
     }
     cout << "optimized accounts size " << dataItemMap.size() << endl;
     
@@ -432,15 +741,11 @@ class MasterServiceHandler : virtual public MasterServiceIf {
     valfile.open(dir_path+"be_val.csv",std::ofstream::out | std::ofstream::trunc); 
     
     ofstream val2file;
-    val2file.open(dir_path+"be_val2.csv",std::ofstream::out | std::ofstream::trunc);
-
-    ofstream createfile;
-    createfile.open(dir_path+"be_create.csv",std::ofstream::out | std::ofstream::trunc); 
-    
-    ofstream analyzefile;
-    analyzefile.open(dir_path+"be_analyze.csv",std::ofstream::out | std::ofstream::trunc); 
-    
-
+    val2file.open(dir_path+"be_val2.csv",std::ofstream::out | std::ofstream::trunc); 
+   
+    ofstream tcfile;
+    tcfile.open(dir_path+"be_txns_count.csv",std::ofstream::out | std::ofstream::trunc);
+ 
     // Your implementation goes here
     int64_t index = 0;
     for (json::iterator data = ethereum_data.begin(); data != ethereum_data.end(); ++data) {
@@ -457,17 +762,16 @@ class MasterServiceHandler : virtual public MasterServiceIf {
       auto start = chrono::steady_clock::now();
       block.number = index++;
       block.prevHash = prevBlockHash;
-      if (block.number > 10 and mining) break;
+      block.nonce = 0;
+      if (block.number > 100 and mining) break;
 
       createBlock(data);
       
-      auto end1 = chrono::steady_clock::now();
-      createfile << chrono::duration_cast<chrono::microseconds>(end1 - start).count() << "\n";
-
 
       //if (block.number >= 5) break;
       cout << block.number << "\t" << block.transactionsList.size() << "\n";
-
+      tcfile << block.number << ","<< block.transactionsList.size();
+      
       
       // miner status set to false for each block
       // it is to stop mining once solution is found
@@ -476,13 +780,28 @@ class MasterServiceHandler : virtual public MasterServiceIf {
 
       if (block.transactionsList.size() > 0) {
         Logger::instance().log(MSG+" Block "+to_string(block.number)+" analyze starts", Logger::kLogLevelInfo);
-        sendTransactionMap.clear();
+        //sendTransactionMap.clear();
         analyze(block.transactionsList);
-        auto end2 = chrono::steady_clock::now();
-        analyzefile << chrono::duration_cast<chrono::microseconds>(end2 - start).count() << "\n";
         Logger::instance().log(MSG+" Block "+to_string(block.number)+" analyze ends", Logger::kLogLevelInfo);
+	
+	/*
+	for (auto tx: block.transactionsList) {
+        	cout << "txid:" << tx.transactionID << ",from:" << tx.fromAddress << ",to:" << tx.toAddress << ",value:" 
+                                << tx.value << ",input:" << tx.input << ",creates:" << tx.creates << endl;
+        }
 
-	      block.transactionsList.clear();
+
+	for (auto it : sendTransactionMap) {
+		cout << it.first << " " << it.second.size() << endl;
+		for (auto tx: it.second) {
+			cout << "txid:" << tx.transactionID << ",from:" << tx.fromAddress << ",to:" << tx.toAddress << ",value:" 
+				<< tx.value << ",input:" << tx.input << ",creates:" << tx.creates << endl; 
+		}
+		cout << endl;
+	}
+	exit(-1);
+	*/
+	//block.transactionsList.clear();
 
         //sendTransactions
         
@@ -500,7 +819,7 @@ class MasterServiceHandler : virtual public MasterServiceIf {
 
         for (auto const& worker : WorkerList) {
 	  //pthread_t threads;
-	        struct thread_data *td = new(nothrow) struct thread_data;
+	  struct thread_data *td = new(nothrow) struct thread_data;
           td->threadID = thID;
           td->workerID = worker.workerID;
           td->workerIP = worker.workerIP;
@@ -509,9 +828,9 @@ class MasterServiceHandler : virtual public MasterServiceIf {
 
           Logger::instance().log(MSG+" Block "+to_string(block.number)+" thread " + to_string(thID) +" starts", Logger::kLogLevelInfo); 
           rc = pthread_create(&threads[thID], &attr, connectWorker, (void *)td);
-          
+          tcfile << "," << sendTransactionMap[worker.workerID].size();
           if (rc) {
-	           cout << "MS create failed" << endl;
+	     cout << "MS create failed" << endl;
              exit(-1);
           }
           thID = (thID+1) % NUM_THREADS;
@@ -530,9 +849,11 @@ class MasterServiceHandler : virtual public MasterServiceIf {
         }                                                                                                                                                                           
       }
 
-      auto end3 = chrono::steady_clock::now();
-      txnfile << chrono::duration_cast<chrono::microseconds>(end3 - start).count() << "\n";
+      auto end2 = chrono::steady_clock::now();
+      txnfile << chrono::duration_cast<chrono::microseconds>(end2 - start).count() << "\n";
       //txnfile.close();
+
+      tcfile << endl;
 
       //cout << "txns size: " << block.transactionsList.size() << endl;
 
@@ -599,12 +920,15 @@ class MasterServiceHandler : virtual public MasterServiceIf {
 	cout << "Mining Block ends" << endl;
 
         cout << endl;
+	cout << "waiting" << endl;
         while (!minerStatus) {
+	  cout << "waiting";
           cout << minerStatus;
           //bool status = minerStatus;
           //sleep(1);
           std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
+	cout << "waiting ends" << endl;
         cout << endl;
 
         //Logger::instance().log(MSG+" Block " + to_string(block.number) + " Block Mining ends", Logger::kLogLevelInfo);
@@ -613,12 +937,12 @@ class MasterServiceHandler : virtual public MasterServiceIf {
       //cout << "waiting ends" << endl;
       //prevBlock = block;
 
-      auto end4 = chrono::steady_clock::now();
-      minefile << chrono::duration_cast<chrono::microseconds>(end4 - end3).count() << "\n";
+      auto end3 = chrono::steady_clock::now();
+      minefile << chrono::duration_cast<chrono::microseconds>(end3 - end2).count() << "\n";
       //txnfile.close();
       
 
-      /*
+
       for (auto tx: block.transactionsList) {
 	block.finalDataItemMap[tx.fromAddress] = dataItemMap[tx.fromAddress];
 	block.finalDataItemMap[tx.toAddress] = dataItemMap[tx.toAddress];
@@ -626,11 +950,13 @@ class MasterServiceHandler : virtual public MasterServiceIf {
       }
       //block.finalDataItemMap = dataItemMap;
       //cout << "block dataItemMap size: " << block.finalDataItemMap.size() << endl;
+	
       for (auto it: sendTransactionMap) {
 	for (auto tx : it.second) {
 		block.sendTxnMap[it.first].push_back(tx.transactionID);
 	}
-	}*/
+	}
+	
       //block.sendTxnMap = sendTransactionMap;
       //cout << "block sendTxnMap size: " << block.sendTxnMap.size() << endl;
 
@@ -638,10 +964,207 @@ class MasterServiceHandler : virtual public MasterServiceIf {
       //Logger::instance().log(MSG+" Block "+to_string(block.number)+" clear_memory starts", Logger::kLogLevelInfo);
       //Logger::instance().log(MSG+" Block "+to_string(block.number)+" clear_memory ends", Logger::kLogLevelInfo);
 
-      auto end5 = chrono::steady_clock::now();
-      e2efile << chrono::duration_cast<chrono::microseconds>(end5 - start).count() << "\n";
+      auto end4 = chrono::steady_clock::now();
+      e2efile << chrono::duration_cast<chrono::microseconds>(end4 - start).count() << "\n";
 
+
+
+      // validation without sharing info starts
+      cout << endl << endl;
+      cout << "validation without sharing info starts" << endl;
+      cout << block.number << "\t" << block.transactionsList.size() << "\n";
+      //tcfile << block.number << ","<< block.transactionsList.size();
+      
+      
+      // miner status set to false for each block
+      // it is to stop mining once solution is found
+      //minerStatus = false;
+      //double uncle_reward = 0;
+
+      if (block.transactionsList.size() > 0) {
+        Logger::instance().log(MSG+" Block "+to_string(block.number)+" valAnalyze starts", Logger::kLogLevelInfo);
+        //sendTransactionMap.clear();
+        valAnalyze(block.transactionsList);
+        Logger::instance().log(MSG+" Block "+to_string(block.number)+" valAnalyze ends", Logger::kLogLevelInfo);
+	
 	/*
+	for (auto tx: block.transactionsList) {
+        	cout << "txid:" << tx.transactionID << ",from:" << tx.fromAddress << ",to:" << tx.toAddress << ",value:" 
+                                << tx.value << ",input:" << tx.input << ",creates:" << tx.creates << endl;
+        }
+
+
+	for (auto it : sendTransactionMap) {
+		cout << it.first << " " << it.second.size() << endl;
+		for (auto tx: it.second) {
+			cout << "txid:" << tx.transactionID << ",from:" << tx.fromAddress << ",to:" << tx.toAddress << ",value:" 
+				<< tx.value << ",input:" << tx.input << ",creates:" << tx.creates << endl; 
+		}
+		cout << endl;
+	}
+	exit(-1);
+	*/
+	//block.transactionsList.clear();
+
+        //sendTransactions
+        
+        pthread_t threads[NUM_THREADS];
+        pthread_attr_t attr;
+        //struct thread_data td[NUM_THREADS];
+        //struct thread_data *td = new(nothrow) struct thread_data[NUM_THREADS];
+        int rc;
+	int thID = 0;
+	void *status;
+
+        // Initialize and set thread joinable
+        pthread_attr_init(&attr);
+        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+        for (auto const& worker : WorkerList) {
+	  //pthread_t threads;
+	  struct thread_data *td = new(nothrow) struct thread_data;
+          td->threadID = thID;
+          td->workerID = worker.workerID;
+          td->workerIP = worker.workerIP;
+          td->workerPort = worker.workerPort;
+          td->number = block.number;
+
+          Logger::instance().log(MSG+" Block "+to_string(block.number)+" val_thread " + to_string(thID) +" starts", Logger::kLogLevelInfo); 
+          rc = pthread_create(&threads[thID], &attr, connectValWorker, (void *)td);
+          //tcfile << "," << valSendTransactionMap[worker.workerID].size();
+          if (rc) {
+	     cout << "MS create failed" << endl;
+             exit(-1);
+          }
+          thID = (thID+1) % NUM_THREADS;
+        }
+        
+        // free attribute and wait for the other threads
+        pthread_attr_destroy(&attr);
+        
+        for(int p = 0; p < NUM_THREADS; p++ ) {
+          rc = pthread_join(threads[p], &status);
+          if (rc) {
+	     cout << "MS join failed" << endl;
+             exit(-1);
+          }
+          //Logger::instance().log(MSG+" Block "+to_string(block.number)+" thread " + to_string(td[thID].threadID) +" ends", Logger::kLogLevelInfo);
+        }                                                                                                                                                                           
+      }
+
+      bool blockStatus = true;
+      for (auto it :block.finalDataItemMap)
+      {
+        if (valDataItemMap.find(it.first) != valDataItemMap.end()) {
+                if (valDataItemMap[it.first].value != it.second.value) {
+                        blockStatus = false;
+			cout << valDataItemMap[it.first].value <<  " " << it.second.value << endl;
+			break;
+                }
+        } else {
+                cout << "val key not found" << endl;
+        }
+
+      }
+
+
+      auto end5 = chrono::steady_clock::now();
+      valfile << chrono::duration_cast<chrono::microseconds>(end5 - end4).count() << "\n";
+      //txnfile.close();
+
+      //tcfile << endl;
+
+      //cout << "txns size: " << block.transactionsList.size() << endl;
+
+      //block.finalDataItemMap = dataItemMap;
+      //cout << "block dataItemMap size: " << block.finalDataItemMap.size() << endl;
+      //block.sendTxnMap = sendTransactionMap;
+      //cout << "block sendTxnMap size: " << block.sendTxnMap.size() << endl;
+
+      // validation without sharing info starts
+      cout << endl << endl;
+      cout << "validation with sharing info starts" << endl;
+      cout << block.number << "\t" << block.transactionsList.size() << "\n";
+
+      if (block.transactionsList.size() > 0) {
+
+        //sendTransactions
+        //cout << "txn exe starts" << endl;
+        
+        pthread_t threads[NUM_THREADS];
+        pthread_attr_t attr;
+        //struct thread_data td[NUM_THREADS];
+        int rc;
+        int thID = 0;
+        void *status;
+
+        // Initialize and set thread joinable
+        pthread_attr_init(&attr);
+        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+        for (auto const& worker : WorkerList) {
+	  struct thread_data *td = new(nothrow) struct thread_data;
+          td->threadID = thID;
+          td->workerID = worker.workerID;
+          td->workerIP = worker.workerIP;
+          td->workerPort = worker.workerPort;
+          td->number = block.number;
+
+          Logger::instance().log(MSG+" Block "+to_string(block.number)+" thread " + to_string(thID) +" starts", Logger::kLogLevelInfo); 
+          rc = pthread_create(&threads[thID], &attr, connectVal2Worker, (void *)td);
+          
+          if (rc) {
+	     cout << "create failed val2" << endl;
+             exit(-1);
+          }
+          thID = (thID+1) % NUM_THREADS;
+        }
+        
+        // free attribute and wait for the other threads
+        pthread_attr_destroy(&attr);
+        
+        for(int p = 0; p < NUM_THREADS; p++ ) {
+          rc = pthread_join(threads[p], &status);
+          if (rc) {
+             cout << "join failed val2" << endl;
+             exit(-1);
+          }
+          //Logger::instance().log(MSG+" Block "+to_string(block.number)+" thread " + to_string(td->threadID) +" ends", Logger::kLogLevelInfo);
+        }                                                                                                                                                                           
+      }
+
+      //cout << "txn exe ends" << endl;
+      //auto end2 = chrono::steady_clock::now();
+      //txnfile << chrono::duration_cast<chrono::microseconds>(end2 - start).count() << "\n";
+      //txnfile.close();
+
+      //cout << "validation starts" << endl;
+	
+      // verifying dataItemMap
+      blockStatus = true;
+
+      for (auto it :block.finalDataItemMap)
+      {
+        if (val2DataItemMap.find(it.first) != val2DataItemMap.end()) {
+                if (val2DataItemMap[it.first].value != it.second.value) {
+                        blockStatus = false;
+                        cout << val2DataItemMap[it.first].value <<  " " << it.second.value << endl;
+                        break;
+                }
+        } else {
+                cout << "val key not found" << endl;
+        }
+
+      }
+
+
+
+      auto end6 = chrono::steady_clock::now();
+      val2file << chrono::duration_cast<chrono::microseconds>(end6 - end5).count() << "\n";
+
+
+
+/*	
 	
 	//cout << "validation" << endl;
       // Validation
@@ -653,7 +1176,7 @@ class MasterServiceHandler : virtual public MasterServiceIf {
       //Logger::instance().log(MSG+" Block "+to_string(block.number) +" connection to master "+WID+" starts", Logger::kLogLevelInfo);
      // while (1) {
           //try {
-                transport->open();
+      transport->open();
            //     break;
           //} catch (exception& e) {
             //    cout << "Val Error: " << e.what() << endl;
@@ -668,7 +1191,11 @@ class MasterServiceHandler : virtual public MasterServiceIf {
       // without sharing info
       cout << "validateBlock starts" << endl;
       cout << block.number << "\t" << block.transactionsList.size() << endl; 
-      masterValidator.validateBlock(block); 
+      try{
+	masterValidator.validateBlock(block); 
+	} catch (exception& e) {
+                cout << "Val Error: " << e.what() << endl;
+           }
 
       cout << "validateBlock ends" << endl;
 
@@ -679,6 +1206,10 @@ class MasterServiceHandler : virtual public MasterServiceIf {
 
       auto end5 = chrono::steady_clock::now();
       valfile << chrono::duration_cast<chrono::microseconds>(end5 - end4).count() << "\n";
+
+*/
+
+/*
 
       // with sharing info      
 
@@ -705,7 +1236,13 @@ class MasterServiceHandler : virtual public MasterServiceIf {
       // with sharing info
       cout << "validateBlockWithInfo starts" << endl;
       cout << "size at master: " << block.sendTxnMap.size() << endl;
-      masterValidator2.validateBlockWithInfo(block);
+
+	try {
+      	masterValidator2.validateBlockWithInfo(block);
+	} catch (exception& e) {
+                cout << "Val2 Error: " << e.what() << endl;
+           }
+
       cout << "size at master after execution: " << block.sendTxnMap.size() << endl;
 	cout << "validateBlockWithInfo ends" << endl;
       // with sharing info
@@ -716,12 +1253,13 @@ class MasterServiceHandler : virtual public MasterServiceIf {
       
 
       auto end6 = chrono::steady_clock::now();
-      val2file << chrono::duration_cast<chrono::microseconds>(end6 - end5).count() << "\n";
+      val2file << chrono::duration_cast<chrono::microseconds>(end6 - end4).count() << "\n";
+	
+*/	
+     
 
-	*/
-      
-
-      clear_memory(); 
+      clear_memory_miner(); 
+      clear_memory_val();
       
 
       //std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -781,10 +1319,8 @@ class MasterServiceHandler : virtual public MasterServiceIf {
     txnfile.close();
     e2efile.close();
     minefile.close();
-    createfile.close();
-    analyzefile.close();
-  
-      
+    valfile.close();
+    val2file.close();
   }
 
   void recvMiningStatus(const int64_t nonce, const int32_t number) {
@@ -792,9 +1328,10 @@ class MasterServiceHandler : virtual public MasterServiceIf {
 
     //Logger::instance().log("Block " + to_string(block.number) + " recvMiningStatus starts ", Logger::kLogLevelInfo);
     //cout << "\n" << newBlock.number << "\t" << number << "\t" << minerStatus << endl;
-
+    cout << number << "\t" << nonce << endl;
     if (block.number == number && !minerStatus) {
       minerStatus = true;
+	cout << number << "\t" << nonce << endl;
 	block.nonce = nonce;
       
       string block_str = convert_block_to_string(block);
@@ -829,7 +1366,7 @@ int main(int argc, char **argv) {
   ::apache::thrift::stdcxx::shared_ptr<TProtocolFactory> protocolFactory(new TBinaryProtocolFactory());
   
   // using thread pool with maximum 15 threads to handle incoming requests
-  shared_ptr<ThreadManager> threadManager = ThreadManager::newSimpleThreadManager(5);
+  shared_ptr<ThreadManager> threadManager = ThreadManager::newSimpleThreadManager(15);
   shared_ptr<PosixThreadFactory> threadFactory = shared_ptr<PosixThreadFactory>(new PosixThreadFactory());
   threadManager->threadFactory(threadFactory);
   threadManager->start();

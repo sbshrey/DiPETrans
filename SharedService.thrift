@@ -82,7 +82,7 @@ struct Block {
     3: required string prevHash;
     4: required list<Transaction> transactionsList;
     5: required map<string,DataItem> finalDataItemMap;
-    6: required map<i16,list<Transaction>> sendTxnMap;
+    6: required map<i16,list<i64>> sendTxnMap;
 }
 
 service SharedService {

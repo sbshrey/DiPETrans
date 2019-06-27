@@ -284,7 +284,7 @@ void *connectWorker (void *threadarg) {
   struct thread_data *worker;
   worker = (struct thread_data *) threadarg;
 
-  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" thread "+ to_string(worker->workerID) +" starts", Logger::kLogLevelInfo);
+  Logger::instance().log(MSG+" Block "+to_string(worker->number) +" thread "+ to_string(worker->workerID) +" starts", Logger::kLogLevelInfo);
       
 
   std::shared_ptr<TTransport> socket(new TSocket(worker->workerIP, worker->workerPort));
@@ -338,7 +338,10 @@ void *connectWorker (void *threadarg) {
 
   transport->close();
   //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" connection to worker "+to_string(worker->workerID)+" ends", Logger::kLogLevelInfo);
-  //Logger::instance().log(MSG+" Block "+to_string(worker->number) +" thread "+ to_string(worker->workerID) +" ends", Logger::kLogLevelInfo);
+  Logger::instance().log(MSG+" Block "+to_string(worker->number) +" thread "+ to_string(worker->workerID) +" ends", Logger::kLogLevelInfo);
+
+
+  delete worker;
       
   pthread_exit(&worker->threadID);
 }
@@ -406,7 +409,7 @@ class MasterValidationHandler : virtual public MasterValidationIf {
 
   void validateBlock(const  ::SharedService::Block& block) {
     // open a file in write mode.
-    
+    cout << "val starts" << endl;
     // Your implementation goes here
     ofstream e2efile;
     ofstream txnfile;
@@ -432,7 +435,7 @@ class MasterValidationHandler : virtual public MasterValidationIf {
       double uncle_reward = 0;
 
       if (block.transactionsList.size() > 0) {
-
+	cout << "txn execution starts" << endl;
         //Logger::instance().log(MSG+" Block "+to_string(block.number)+" analyze starts", Logger::kLogLevelInfo);
         analyze(block.transactionsList);
         //Logger::instance().log(MSG+" Block "+to_string(block.number)+" analyze ends", Logger::kLogLevelInfo);
@@ -440,7 +443,7 @@ class MasterValidationHandler : virtual public MasterValidationIf {
         
         pthread_t threads[NUM_THREADS];
         pthread_attr_t attr;
-        struct thread_data td[NUM_THREADS];
+        //struct thread_data td[NUM_THREADS];
         int rc;
         int thID = 0;
         void *status;
@@ -450,14 +453,15 @@ class MasterValidationHandler : virtual public MasterValidationIf {
         pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
         for (auto const& worker : WorkerList) {
-          td[thID].threadID = thID;
-          td[thID].workerID = worker.workerID;
-          td[thID].workerIP = worker.workerIP;
-          td[thID].workerPort = worker.workerPort;
-          td[thID].number = block.number;
+	  struct thread_data *td = new(nothrow) struct thread_data;
+          td->threadID = thID;
+          td->workerID = worker.workerID;
+          td->workerIP = worker.workerIP;
+          td->workerPort = worker.workerPort;
+          td->number = block.number;
 
-          //Logger::instance().log(MSG+" Block "+to_string(block.number)+" thread " + to_string(thID) +" starts", Logger::kLogLevelInfo); 
-          rc = pthread_create(&threads[thID], &attr, connectWorker, (void *)&td[thID]);
+          Logger::instance().log(MSG+" Block "+to_string(block.number)+" thread " + to_string(thID) +" starts", Logger::kLogLevelInfo); 
+          rc = pthread_create(&threads[thID], &attr, connectWorker, (void *)td);
           
           if (rc) {
 	     cout << "create failed val" << endl;
@@ -475,9 +479,10 @@ class MasterValidationHandler : virtual public MasterValidationIf {
 	     cout << "join failed val" << endl;
              exit(-1);
           }
-          //Logger::instance().log(MSG+" Block "+to_string(block.number)+" thread " + to_string(td[thID].threadID) +" ends", Logger::kLogLevelInfo);
+          //Logger::instance().log(MSG+" Block "+to_string(block.number)+" thread " + to_string(td->threadID) +" ends", Logger::kLogLevelInfo);
         }                                                                                                                                                                           
       }
+      cout << "txn execution ends" << endl;
 
       auto end2 = chrono::steady_clock::now();
       txnfile << chrono::duration_cast<chrono::microseconds>(end2 - start).count() << "\n";
@@ -507,7 +512,7 @@ class MasterValidationHandler : virtual public MasterValidationIf {
     auto end4 = chrono::steady_clock::now();
     e2efile << chrono::duration_cast<chrono::microseconds>(end4 - start).count() << "\n";
 
-
+    cout << "val ends" << endl;
     e2efile.close();
     txnfile.close();
     /*
@@ -546,6 +551,7 @@ class MasterValidationHandler : virtual public MasterValidationIf {
 
   void validateBlockWithInfo(const  ::SharedService::Block& block) {
     // Your implementation goes here
+    //MSG = "MasterValidator2";
     cout << "val2 starts" << endl;
     ofstream e2efile;
     ofstream txnfile;
@@ -602,7 +608,7 @@ class MasterValidationHandler : virtual public MasterValidationIf {
         
         pthread_t threads[NUM_THREADS];
         pthread_attr_t attr;
-        struct thread_data td[NUM_THREADS];
+        //struct thread_data td[NUM_THREADS];
         int rc;
         int thID = 0;
         void *status;
@@ -612,14 +618,15 @@ class MasterValidationHandler : virtual public MasterValidationIf {
         pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
         for (auto const& worker : WorkerList) {
-          td[thID].threadID = thID;
-          td[thID].workerID = worker.workerID;
-          td[thID].workerIP = worker.workerIP;
-          td[thID].workerPort = worker.workerPort;
-          td[thID].number = block.number;
+	  struct thread_data *td = new(nothrow) struct thread_data;
+          td->threadID = thID;
+          td->workerID = worker.workerID;
+          td->workerIP = worker.workerIP;
+          td->workerPort = worker.workerPort;
+          td->number = block.number;
 
-          //Logger::instance().log(MSG+" Block "+to_string(block.number)+" thread " + to_string(thID) +" starts", Logger::kLogLevelInfo); 
-          rc = pthread_create(&threads[thID], &attr, connectWorker, (void *)&td[thID]);
+          Logger::instance().log(MSG+" Block "+to_string(block.number)+" thread " + to_string(thID) +" starts", Logger::kLogLevelInfo); 
+          rc = pthread_create(&threads[thID], &attr, connectWorker, (void *)td);
           
           if (rc) {
 	     cout << "create failed val2" << endl;
@@ -637,7 +644,7 @@ class MasterValidationHandler : virtual public MasterValidationIf {
              cout << "join failed val2" << endl;
              exit(-1);
           }
-          //Logger::instance().log(MSG+" Block "+to_string(block.number)+" thread " + to_string(td[thID].threadID) +" ends", Logger::kLogLevelInfo);
+          //Logger::instance().log(MSG+" Block "+to_string(block.number)+" thread " + to_string(td->threadID) +" ends", Logger::kLogLevelInfo);
         }                                                                                                                                                                           
       }
 

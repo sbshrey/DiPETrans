@@ -45,8 +45,8 @@ string dir_path;
 string MSG="WorkerServer";
 
 int masterPort = 8090;
-//string masterIP = "192.168.0.11";
-string masterIP = "localhost";
+string masterIP = "192.168.0.11";
+//string masterIP = "localhost";
 
 
 string convert_block_to_string(Block block) {
@@ -163,7 +163,8 @@ struct mine_data *td;
     // sent transaction to execute      
 
     masterClient.recvMiningStatus(newBlock.nonce, newBlock.number); // returns local worker response
-    //cout << worker->threadID << ":" << sendTransactionMap[worker->workerID].size() << "\t";
+    cout << "Worker " << WID << "sent to master " << newBlock.number << " " << newBlock.nonce << endl;    
+//cout << worker->threadID << ":" << sendTransactionMap[worker->workerID].size() << "\t";
 
     //Logger::instance().log(MSG+" Block "+to_string(block.number) +" WorkerID "+WID+" mineBlock() ends", Logger::kLogLevelInfo);
 
@@ -173,7 +174,7 @@ struct mine_data *td;
     //free(td);
     delete td;
 
-    //pthread_exit(NULL);
+    pthread_exit(NULL);
 }
 
 
@@ -181,6 +182,12 @@ struct mine_data *td;
 ofstream nttfile;
 ofstream cttfile;
 
+
+ofstream valnttfile;
+ofstream valcttfile;
+
+ofstream val2nttfile;
+ofstream val2cttfile;
 
 
 struct mine_data td;
@@ -210,6 +217,15 @@ class WorkerServiceHandler : public WorkerServiceIf {
     nttfile.open(dir_path + "be_ntt_"+WID+".log",std::ofstream::out | std::ofstream::trunc);
     
     cttfile.open(dir_path + "be_ctt_"+WID+".log",std::ofstream::out | std::ofstream::trunc);
+
+    valnttfile.open(dir_path + "be_val_ntt_"+WID+".log",std::ofstream::out | std::ofstream::trunc);
+
+    valcttfile.open(dir_path + "be_val_ctt_"+WID+".log",std::ofstream::out | std::ofstream::trunc);
+
+    val2nttfile.open(dir_path + "be_val2_ntt_"+WID+".log",std::ofstream::out | std::ofstream::trunc);
+
+    val2cttfile.open(dir_path + "be_val2_ctt_"+WID+".log",std::ofstream::out | std::ofstream::trunc);
+
     
   }
 
@@ -366,6 +382,317 @@ class WorkerServiceHandler : public WorkerServiceIf {
     //Logger::instance().log(MSG+" worker "+ WID +" recvTransactions ends", Logger::kLogLevelInfo);
     auto end = chrono::steady_clock::now();
   }
+
+  void recvValTransactions( ::SharedService::WorkerResponse& _return, const std::vector< ::SharedService::Transaction> & TransactionsList, const std::map<std::string,  ::SharedService::DataItem> & dataItemMap, const std::set<std::string> & contractAddresses) {
+    // Your implementation goes here
+    
+    double normal_txn_time = 0;
+    double contract_txn_time = 0;
+
+    //Logger::instance().log(MSG+" worker "+ WID +" recvTransactions starts", Logger::kLogLevelInfo);
+    auto start = chrono::steady_clock::now();
+    int successful_transactions = 0;
+    int failed_transactions = 0;
+    int total_transactions = 0;
+
+
+    int sc_cnt = 0;
+    int nsc_cnt = 0;
+
+    double tx_fees = 0;
+
+    //Logger::instance().log(MSG+" dataItemMap starts", Logger::kLogLevelInfo);
+    for (auto const& address: dataItemMap)
+    {
+      _return.dataItemMap[address.first] = address.second;
+      //cout << "txn value at worker " << _return.dataItemMap[address.first].value << "\t" << address.second.value << endl;
+    }
+    //Logger::instance().log(MSG+" dataItemMap ends", Logger::kLogLevelInfo);
+
+    //Logger::instance().log(MSG+" contractAddresses starts", Logger::kLogLevelInfo);
+    //cout << "contractAddresses size: " << contractAddresses.size() << endl;
+    for (auto const& address: contractAddresses)
+    {
+	//cout << address << endl;
+      _return.contractAddresses.insert(address);
+      //cout << "txn value at worker " << _return.dataItemMap[address.first].value << "\t" << address.second.value << endl;
+    }
+    //Logger::instance().log(MSG+" contractAddresses ends", Logger::kLogLevelInfo);
+
+
+
+    //Logger::instance().log(MSG+" TransactionsList starts", Logger::kLogLevelInfo);
+    //cout << endl;
+    for (auto const& tx: TransactionsList) {
+      //cout << "tx" << tx.transactionID << "\t";
+      auto txn_start = chrono::steady_clock::now();
+      auto txn_end = chrono::steady_clock::now();
+      double fee;
+
+      
+      bool status= false;
+      if (tx.toAddress == "creates") {
+        //contract_addresses.push_back(tx.creates);
+        //cout << "creates" << endl;
+        _return.contractAddresses.insert(tx.creates);
+        DataItem localDataItem;
+        call_contract(&localDataItem, tx.creates, tx.fromAddress, tx.toAddress, tx.value);
+        
+        //cout << "size before " << _return.dataItemMap[tx.creates].balances.size() << endl;
+        //_return.dataItemMap[tx.creates].value = localDataItem.value;
+        _return.dataItemMap[tx.creates] = localDataItem;
+        //_return.dataItemMap[tx.creates].balances = localDataItem.balances;
+        //_return.dataItemMap[tx.creates].allowed = localDataItem.allowed;
+        //_return.dataItemMap[tx.creates].votes = localDataItem.votes;
+        //_return.dataItemMap[tx.creates].balances = localDataItem.balances;
+
+        //cout << "size after " << _return.dataItemMap[tx.creates].balances.size() << endl;
+        //_return.dataItemMap[tx.creates].balances =  localDataItem.balances;
+        txn_end = chrono::steady_clock::now();
+        contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
+        sc_cnt++;
+      } else {
+        bool flag = false;
+        std::set<string>::iterator it = std::find (_return.contractAddresses.begin(), _return.contractAddresses.end(), tx.toAddress); 
+        if (it != _return.contractAddresses.end()) {  
+	  //cout << "contractAddress found in to" << endl;
+          DataItem localDataItem = _return.dataItemMap[tx.toAddress];
+          call_contract(&localDataItem, tx.toAddress, tx.fromAddress, tx.input, tx.value);
+          _return.dataItemMap[tx.toAddress] = localDataItem;
+          //_return.dataItemMap[tx.toAddress].value = localDataItem.value;
+          //strcpy(_return.dataItemMap[tx.toAddress].owner,localDataItem.owner);
+          //_return.dataItemMap[tx.toAddress].owner = localDataItem.owner;
+          //_return.dataItemMap[tx.toAddress].balances = localDataItem.balances;
+          //_return.dataItemMap[tx.toAddress].allowed = localDataItem.allowed;
+          //_return.dataItemMap[tx.toAddress].votes = localDataItem.votes;
+        
+          //_return.dataItemMap[tx.toAddress].balances =  localDataItem.balances;
+          txn_end = chrono::steady_clock::now();
+          contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
+          sc_cnt++;
+          flag = true;
+        }
+
+        it = std::find (_return.contractAddresses.begin(), _return.contractAddresses.end(), tx.fromAddress); 
+        if (it != _return.contractAddresses.end() and !flag) {
+	  //cout << "contractAddress found in from" << endl;  
+          DataItem localDataItem = _return.dataItemMap[tx.fromAddress];
+          call_contract(&localDataItem, tx.fromAddress, tx.toAddress, tx.input, tx.value);
+          _return.dataItemMap[tx.fromAddress] = localDataItem;
+          
+          //_return.dataItemMap[tx.fromAddress].value = localDataItem.value;
+          //_return.dataItemMap[tx.fromAddress].owner = localDataItem.owner;
+          //_return.dataItemMap[tx.fromAddress].balances = localDataItem.balances;
+          //_return.dataItemMap[tx.fromAddress].allowed = localDataItem.allowed;
+          //_return.dataItemMap[tx.fromAddress].votes = localDataItem.votes;
+        
+          //_return.dataItemMap[tx.fromAddress].balances = localDataItem.balances;
+          txn_end = chrono::steady_clock::now();
+          contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
+          sc_cnt++;
+          flag = true;
+        }
+
+        if (!flag) {
+	  //cout << "contractAddress not found" << endl;
+          if (_return.dataItemMap[tx.fromAddress].value >= tx.value) {
+            _return.dataItemMap[tx.fromAddress].value -=  tx.value;
+            _return.dataItemMap[tx.toAddress].value += tx.value;
+            status = true;  
+          } else {
+            //cout << "nsc txn " << _return.dataItemMap[tx.fromAddress].value << "\t" << tx.value << endl;
+            status = false;
+          }
+          txn_end = chrono::steady_clock::now();
+          normal_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
+          nsc_cnt++;
+        }
+      }
+        
+      //cout << endl;
+      if (status) {
+        successful_transactions++;
+      } else {
+        failed_transactions++;
+      }
+      tx_fees += fee;
+      _return.transactionIDList.push_back(tx.transactionID);
+      total_transactions++;
+    }
+
+    cout << "WID " << WID << "\tsc " << sc_cnt << "\tnsc " << nsc_cnt << endl;
+    //cout << "_return.dataItemMap size " << _return.dataItemMap.size() << endl;
+
+    
+    //ofstream scfile;
+    //scfile.open(dir_path+"sc_call.csv",std::ofstream::out | std::ofstream::trunc);
+
+    valcttfile << contract_txn_time << endl;
+    valnttfile << normal_txn_time << endl;
+
+    //_return.transactionFees = tx_fees;
+    //Logger::instance().log(MSG+" TransactionsList ends", Logger::kLogLevelInfo);
+
+    //Logger::instance().log(MSG+" worker "+ WID +" recvTransactions ends", Logger::kLogLevelInfo);
+    auto end = chrono::steady_clock::now();
+  }
+
+   void recvVal2Transactions( ::SharedService::WorkerResponse& _return, const std::vector< ::SharedService::Transaction> & TransactionsList, const std::map<std::string,  ::SharedService::DataItem> & dataItemMap, const std::set<std::string> & contractAddresses) {
+    // Your implementation goes here
+    
+    double normal_txn_time = 0;
+    double contract_txn_time = 0;
+
+    //Logger::instance().log(MSG+" worker "+ WID +" recvTransactions starts", Logger::kLogLevelInfo);
+    auto start = chrono::steady_clock::now();
+    int successful_transactions = 0;
+    int failed_transactions = 0;
+    int total_transactions = 0;
+
+
+    int sc_cnt = 0;
+    int nsc_cnt = 0;
+
+    double tx_fees = 0;
+
+    //Logger::instance().log(MSG+" dataItemMap starts", Logger::kLogLevelInfo);
+    for (auto const& address: dataItemMap)
+    {
+      _return.dataItemMap[address.first] = address.second;
+      //cout << "txn value at worker " << _return.dataItemMap[address.first].value << "\t" << address.second.value << endl;
+    }
+    //Logger::instance().log(MSG+" dataItemMap ends", Logger::kLogLevelInfo);
+
+    //Logger::instance().log(MSG+" contractAddresses starts", Logger::kLogLevelInfo);
+    //cout << "contractAddresses size: " << contractAddresses.size() << endl;
+    for (auto const& address: contractAddresses)
+    {
+	//cout << address << endl;
+      _return.contractAddresses.insert(address);
+      //cout << "txn value at worker " << _return.dataItemMap[address.first].value << "\t" << address.second.value << endl;
+    }
+    //Logger::instance().log(MSG+" contractAddresses ends", Logger::kLogLevelInfo);
+
+
+
+    //Logger::instance().log(MSG+" TransactionsList starts", Logger::kLogLevelInfo);
+    //cout << endl;
+    for (auto const& tx: TransactionsList) {
+      //cout << "tx" << tx.transactionID << "\t";
+      auto txn_start = chrono::steady_clock::now();
+      auto txn_end = chrono::steady_clock::now();
+      double fee;
+
+      
+      bool status= false;
+      if (tx.toAddress == "creates") {
+        //contract_addresses.push_back(tx.creates);
+        //cout << "creates" << endl;
+        _return.contractAddresses.insert(tx.creates);
+        DataItem localDataItem;
+        call_contract(&localDataItem, tx.creates, tx.fromAddress, tx.toAddress, tx.value);
+        
+        //cout << "size before " << _return.dataItemMap[tx.creates].balances.size() << endl;
+        //_return.dataItemMap[tx.creates].value = localDataItem.value;
+        _return.dataItemMap[tx.creates] = localDataItem;
+        //_return.dataItemMap[tx.creates].balances = localDataItem.balances;
+        //_return.dataItemMap[tx.creates].allowed = localDataItem.allowed;
+        //_return.dataItemMap[tx.creates].votes = localDataItem.votes;
+        //_return.dataItemMap[tx.creates].balances = localDataItem.balances;
+
+        //cout << "size after " << _return.dataItemMap[tx.creates].balances.size() << endl;
+        //_return.dataItemMap[tx.creates].balances =  localDataItem.balances;
+        txn_end = chrono::steady_clock::now();
+        contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
+        sc_cnt++;
+      } else {
+        bool flag = false;
+        std::set<string>::iterator it = std::find (_return.contractAddresses.begin(), _return.contractAddresses.end(), tx.toAddress); 
+        if (it != _return.contractAddresses.end()) {  
+	  //cout << "contractAddress found in to" << endl;
+          DataItem localDataItem = _return.dataItemMap[tx.toAddress];
+          call_contract(&localDataItem, tx.toAddress, tx.fromAddress, tx.input, tx.value);
+          _return.dataItemMap[tx.toAddress] = localDataItem;
+          //_return.dataItemMap[tx.toAddress].value = localDataItem.value;
+          //strcpy(_return.dataItemMap[tx.toAddress].owner,localDataItem.owner);
+          //_return.dataItemMap[tx.toAddress].owner = localDataItem.owner;
+          //_return.dataItemMap[tx.toAddress].balances = localDataItem.balances;
+          //_return.dataItemMap[tx.toAddress].allowed = localDataItem.allowed;
+          //_return.dataItemMap[tx.toAddress].votes = localDataItem.votes;
+        
+          //_return.dataItemMap[tx.toAddress].balances =  localDataItem.balances;
+          txn_end = chrono::steady_clock::now();
+          contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
+          sc_cnt++;
+          flag = true;
+        }
+
+        it = std::find (_return.contractAddresses.begin(), _return.contractAddresses.end(), tx.fromAddress); 
+        if (it != _return.contractAddresses.end() and !flag) {
+	  //cout << "contractAddress found in from" << endl;  
+          DataItem localDataItem = _return.dataItemMap[tx.fromAddress];
+          call_contract(&localDataItem, tx.fromAddress, tx.toAddress, tx.input, tx.value);
+          _return.dataItemMap[tx.fromAddress] = localDataItem;
+          
+          //_return.dataItemMap[tx.fromAddress].value = localDataItem.value;
+          //_return.dataItemMap[tx.fromAddress].owner = localDataItem.owner;
+          //_return.dataItemMap[tx.fromAddress].balances = localDataItem.balances;
+          //_return.dataItemMap[tx.fromAddress].allowed = localDataItem.allowed;
+          //_return.dataItemMap[tx.fromAddress].votes = localDataItem.votes;
+        
+          //_return.dataItemMap[tx.fromAddress].balances = localDataItem.balances;
+          txn_end = chrono::steady_clock::now();
+          contract_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
+          sc_cnt++;
+          flag = true;
+        }
+
+        if (!flag) {
+	  //cout << "contractAddress not found" << endl;
+          if (_return.dataItemMap[tx.fromAddress].value >= tx.value) {
+            _return.dataItemMap[tx.fromAddress].value -=  tx.value;
+            _return.dataItemMap[tx.toAddress].value += tx.value;
+            status = true;  
+          } else {
+            //cout << "nsc txn " << _return.dataItemMap[tx.fromAddress].value << "\t" << tx.value << endl;
+            status = false;
+          }
+          txn_end = chrono::steady_clock::now();
+          normal_txn_time += chrono::duration_cast<chrono::microseconds>(txn_end - txn_start).count();
+          nsc_cnt++;
+        }
+      }
+        
+      //cout << endl;
+      if (status) {
+        successful_transactions++;
+      } else {
+        failed_transactions++;
+      }
+      tx_fees += fee;
+      _return.transactionIDList.push_back(tx.transactionID);
+      total_transactions++;
+    }
+
+    cout << "WID " << WID << "\tsc " << sc_cnt << "\tnsc " << nsc_cnt << endl;
+    //cout << "_return.dataItemMap size " << _return.dataItemMap.size() << endl;
+
+    
+    //ofstream scfile;
+    //scfile.open(dir_path+"sc_call.csv",std::ofstream::out | std::ofstream::trunc);
+
+    val2cttfile << contract_txn_time << endl;
+    val2nttfile << normal_txn_time << endl;
+
+    //_return.transactionFees = tx_fees;
+    //Logger::instance().log(MSG+" TransactionsList ends", Logger::kLogLevelInfo);
+
+    //Logger::instance().log(MSG+" worker "+ WID +" recvTransactions ends", Logger::kLogLevelInfo);
+    auto end = chrono::steady_clock::now();
+  }
+
+
+
 
   void mineBlock(const  ::SharedService::Block& block, const int64_t nonce, const int16_t interval) {
     // Your implementation goes here

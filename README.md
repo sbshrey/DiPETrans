@@ -24,3 +24,6 @@ User can containers or multiple nodes to create their own environment to run DiP
 4. Update run.py similar to changes made to above cpp files.
 5. run the setup using the updated run.py script
 
+
+## Technical Report
+The technical report is available here: https://arxiv.org/abs/1906.11721

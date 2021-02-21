@@ -10,8 +10,6 @@ We report experiments using over 5 million real transactions from the Ethereum b
 
 ## DiPETrans setup
 
-The **DiPETrans** will work in any distributed 
-
 ### Part 1 : Setup distributed environment
 
 User can containers or multiple nodes to create their own environment to run DiPETrans implementation. There is no limit on number of machines that user can create within community. The nodes part of the network must have passwordless ssh access. The current version has the hard coded ip and port information which will be modularised soon. In the later version, we will be adding a config file where users can mention the ip and port for the nodes and that will be used to communicate with the other nodes part of the network.
